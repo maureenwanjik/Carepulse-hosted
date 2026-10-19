@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react'
 import { Medicine } from '@/types/appwrite.types'
 import { listMedicinesForStore } from '@/lib/actions/medicine.actions'
-import Image from 'next/image'
 import Link from 'next/link'
 import { PackageSearch, Search } from 'lucide-react'
+import MedicineProductImage from '@/components/medicines/MedicineProductImage'
 
 // ─── Skeleton Card ────────────────────────────────────────────────────────────
 const SkeletonCard = () => (
@@ -143,16 +143,13 @@ const MedicinePage: React.FC = () => {
             >
               {/* Image */}
               <div className="relative h-44 bg-dark-300 flex-shrink-0 flex items-center justify-center">
-                {med.medicineImageUrl ? (
-                  <Image
-                    src={med.medicineImageUrl}
-                    alt={med.medicineName}
-                    fill
-                    className="object-contain p-4 group-hover:scale-105 transition-transform duration-200"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center"><PackageSearch aria-hidden="true" size={48} strokeWidth={1.4} className="text-dark-600" /></div>
-                )}
+                <MedicineProductImage
+                  src={med.medicineImageUrl}
+                  name={med.medicineName}
+                  medicineId={med.$id}
+                  fill
+                  className="object-contain p-4 group-hover:scale-105 transition-transform duration-200"
+                />
                 {/* Badges */}
                 {med.requiresPrescription && (
                   <span className="absolute top-2 right-2 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-semibold text-white">

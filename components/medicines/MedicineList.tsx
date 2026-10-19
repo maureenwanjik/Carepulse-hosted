@@ -2,11 +2,11 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import Image from "next/image";
 import { Medicine } from "@/types/appwrite.types";
 import MedicineFormModal from "./MedicineFormModal";
 import DeleteMedicineButton from "./DeleteMedicineButton";
-import { PackageSearch, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import MedicineProductImage from "./MedicineProductImage";
 
 interface MedicineListProps {
   initialMedicines: Medicine[];
@@ -171,19 +171,14 @@ const MedicineList = ({ initialMedicines }: MedicineListProps) => {
                   {/* Name + image */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      {medicine.medicineImageUrl ? (
-                        <Image
-                          src={medicine.medicineImageUrl}
-                          width={36}
-                          height={36}
-                          alt={medicine.medicineName}
-                          className="rounded-md object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-dark-500 text-12-semibold text-dark-700">
-                          <PackageSearch aria-hidden="true" size={18} strokeWidth={1.5} />
-                        </div>
-                      )}
+                      <MedicineProductImage
+                        src={medicine.medicineImageUrl}
+                        name={medicine.medicineName}
+                        medicineId={medicine.$id}
+                        width={36}
+                        height={36}
+                        className="rounded-md object-cover"
+                      />
                       <div>
                         <p className="text-14-medium text-light-200">
                           {medicine.medicineName}

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Medicine } from '@/types/appwrite.types'
 import { getMedicineById } from '@/lib/actions/medicine.actions'
-import Image from 'next/image'
+import MedicineProductImage from '@/components/medicines/MedicineProductImage'
 import { useStateContext } from '@/components/context/StateContext'
 import { IoIosCart } from 'react-icons/io'
 import { AiOutlineMinus, AiOutlinePlus } from 'react-icons/ai'
@@ -13,7 +13,6 @@ import Navbar from '@/components/Navbar'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import getStripe from '@/lib/getStripe'
-import { PackageSearch } from 'lucide-react'
 
 const BuyPage: React.FC = () => {
   const { id } = useParams()
@@ -160,16 +159,13 @@ const handleBuyNow = async () => {
         <div className="rounded-2xl border border-dark-500 bg-dark-400 overflow-hidden flex flex-col md:flex-row">
           {/* Image */}
           <div className="relative w-full md:w-2/5 h-72 md:h-auto bg-dark-300 flex items-center justify-center flex-shrink-0">
-            {medicine.medicineImageUrl ? (
-              <Image
-                src={medicine.medicineImageUrl}
-                alt={medicine.medicineName}
-                fill
-                className="object-contain p-8"
-              />
-            ) : (
-              <PackageSearch aria-hidden="true" size={64} strokeWidth={1.3} className="text-dark-600" />
-            )}
+            <MedicineProductImage
+              src={medicine.medicineImageUrl}
+              name={medicine.medicineName}
+              medicineId={medicine.$id}
+              fill
+              className="object-contain p-8"
+            />
             {/* Badges */}
             {medicine.requiresPrescription && (
               <span className="absolute top-3 right-3 rounded-full bg-red-600 px-3 py-1 text-12-semibold text-white">

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="55" y1="26" x2="575" y2="459" gradientUnits="userSpaceOnUse"><stop stop-color="#F8F5EE"/><stop offset="1" stop-color="#EFE6D6"/></linearGradient>
+    <linearGradient id="glass" x1="244" y1="132" x2="395" y2="371" gradientUnits="userSpaceOnUse"><stop stop-color="#B96B2C"/><stop offset="1" stop-color="#7A3F1B"/></linearGradient>
+    <linearGradient id="label" x1="242" y1="225" x2="397" y2="330" gradientUnits="userSpaceOnUse"><stop stop-color="#fff"/><stop offset="1" stop-color="#F4F3EC"/></linearGradient>
+    <filter id="shadow" x="154" y="66" width="332" height="379" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feGaussianBlur stdDeviation="17"/></filter>
+  </defs>
+  <rect width="640" height="480" rx="28" fill="url(#bg)"/>
+  <circle cx="115" cy="101" r="55" fill="#fff" fill-opacity=".6"/>
+  <circle cx="535" cy="365" r="77" fill="#E1D5C2" fill-opacity=".55"/>
+  <ellipse cx="321" cy="383" fill="#6D4629" fill-opacity=".2" rx="126" ry="25" filter="url(#shadow)"/>
+  <g>
+    <rect x="274" y="85" width="92" height="49" rx="8" fill="#285B46"/>
+    <path d="M283 96h74M283 107h74M283 118h74" stroke="#5C8C71" stroke-width="3" stroke-linecap="round"/>
+    <path d="M263 132h114v24H263z" fill="#E7E9DE"/>
+    <path d="M260 153h120c11 0 20 9 20 20v183c0 16-13 29-29 29H269c-16 0-29-13-29-29V173c0-11 9-20 20-20Z" fill="url(#glass)"/>
+    <path d="M256 170c0-6 5-11 11-11h105c6 0 11 5 11 11v8H256v-8Z" fill="#CC8950" fill-opacity=".56"/>
+    <path d="M243 229c0-9 7-16 16-16h124c9 0 16 7 16 16v94H243v-94Z" fill="url(#label)"/>
+    <rect x="243" y="213" width="156" height="28" rx="8" fill="#147C58"/>
+    <circle cx="264" cy="227" r="7" fill="#fff"/>
+    <path d="M261 227h6m-3-3v6" stroke="#147C58" stroke-linecap="round" stroke-width="1.4"/>
+    <text x="278" y="231" fill="#fff" font-family="Arial,sans-serif" font-size="11" font-weight="700" letter-spacing="1.2">CAREPLUS</text>
+    <text x="267" y="272" fill="#173E30" font-family="Arial,sans-serif" font-size="19" font-weight="700" letter-spacing="1.2">LIQUID</text>
+    <text x="267" y="292" fill="#68776D" font-family="Arial,sans-serif" font-size="10" letter-spacing="1">GENERAL MEDICINE</text>
+    <rect x="267" y="304" width="108" height="1" fill="#DDE5DF"/>
+    <text x="267" y="317" fill="#426451" font-family="Arial,sans-serif" font-size="9" letter-spacing=".7">PHARMACY SUPPLY</text>
+    <path d="M270 169c-7 14-10 31-10 49" stroke="#F4C18B" stroke-opacity=".44" stroke-linecap="round" stroke-width="5"/>
+  </g>
+</svg>
