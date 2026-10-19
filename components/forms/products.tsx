@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Medicine } from '@/types/appwrite.types'
-import { listMedicines } from '@/lib/actions/medicine.actions'
+import { listMedicinesForStore } from '@/lib/actions/medicine.actions'
 import Image from 'next/image'
 import Link from 'next/link'
 import { PackageSearch, Search } from 'lucide-react'
@@ -34,8 +34,12 @@ const MedicinePage: React.FC = () => {
       setLoading(false)
     }, 15000)
 
-    listMedicines()
-      .then((items) => { if (active) setMedicines(items) })
+    listMedicinesForStore()
+      .then(({ medicines: items, error: loadError }) => {
+        if (!active) return
+        setMedicines(items)
+        setError(loadError ?? null)
+      })
       .catch((err) => {
         console.error('Failed to fetch medicines:', err)
         if (active) setError(err instanceof Error ? err.message : 'Could not load medicines from Appwrite.')
@@ -118,6 +122,11 @@ const MedicinePage: React.FC = () => {
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center space-y-3 py-20">
+          <PackageSearch aria-hidden="true" size={40} strokeWidth={1.5} className="text-dark-600" />
+          <p className="text-16-regular text-dark-700">Medicine products are unavailable right now.</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 space-y-3">

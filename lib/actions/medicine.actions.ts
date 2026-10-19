@@ -35,6 +35,14 @@ export type UpdateMedicineParams = Partial<Omit<CreateMedicineParams, "imageFile
 };
 
 const getAppwriteFetchError = (error: unknown, subject: string): Error => {
+  const appwriteError = error as {
+    type?: string;
+    response?: { type?: string };
+  };
+  if (appwriteError?.type === "project_paused" || appwriteError?.response?.type === "project_paused") {
+    return new Error("The Appwrite project is paused. Restore it in the Appwrite Console to load medicine products.");
+  }
+
   const cause = error instanceof Error ? (error as Error & { cause?: { code?: string } }).cause : undefined;
   if (cause?.code === "UND_ERR_CONNECT_TIMEOUT" || (error instanceof Error && error.message === "fetch failed")) {
     return new Error(`Could not connect to Appwrite to load ${subject}. Check internet/firewall access to the configured Appwrite endpoint and confirm the endpoint URL is correct.`);
@@ -57,6 +65,22 @@ export const listMedicines = async (): Promise<Medicine[]> => {
   } catch (error) {
     console.error("Failed to list medicines:", error);
     throw getAppwriteFetchError(error, "medicines");
+  }
+};
+
+// Client-facing listing action returns an error as data so an Appwrite outage
+// does not turn the entire production page into a Server Components error.
+export const listMedicinesForStore = async (): Promise<{
+  medicines: Medicine[];
+  error?: string;
+}> => {
+  try {
+    return { medicines: await listMedicines() };
+  } catch (error) {
+    return {
+      medicines: [],
+      error: error instanceof Error ? error.message : "Could not load medicines from Appwrite.",
+    };
   }
 };
 
