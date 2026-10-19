@@ -56,7 +56,14 @@ export const resendSignupConfirmation = async (email: string) => {
 export const loginUser = async (email: string, password: string) => {
   try {
     const { data, error } = await getSupabasePublic().auth.signInWithPassword({ email, password });
-    if (error || !data.user || !data.session) return { error: error?.message ?? "Login failed." };
+    if (error || !data.user || !data.session) {
+      if (error?.message.toLowerCase().includes("email not confirmed")) {
+        cookies().delete("userId");
+        cookies().delete("sb-access-token");
+        cookies().delete("sb-refresh-token");
+      }
+      return { error: error?.message ?? "Login failed." };
+    }
     setSessionCookies(data.user.id, data.session.access_token, data.session.refresh_token);
     return toUser(data.user);
   } catch (error) {
