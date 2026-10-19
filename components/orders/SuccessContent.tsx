@@ -31,7 +31,7 @@ const SuccessContent = () => {
           throw new Error('Missing order metadata')
         }
 
-        // Save order to Appwrite
+        // Save the paid order to Supabase after Stripe confirms payment.
         const order = await createOrder({
           userId: metadata.userId,
           patientId: metadata.patientId,

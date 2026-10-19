@@ -1,8 +1,8 @@
 //types/appwrite.types
 
-import { Models } from "node-appwrite";
+type LegacyDocumentFields = { $id: string; $createdAt?: string; $updatedAt?: string };
 
-export interface Patient extends Models.Document {
+export interface Patient extends LegacyDocumentFields {
   userId: string;
   name: string;
   email: string;
@@ -26,7 +26,7 @@ export interface Patient extends Models.Document {
   privacyConsent: boolean;
 }
 
-export interface Appointment extends Models.Document {
+export interface Appointment extends LegacyDocumentFields {
   patient: Patient;
   schedule: Date;
   status: Status;
@@ -37,7 +37,7 @@ export interface Appointment extends Models.Document {
   cancellationReason: string | null;
 }
 
-export interface Medicine extends Models.Document {
+export interface Medicine extends LegacyDocumentFields {
   medicineId: string;
   medicineName: string;
   medicineImageId: string;
@@ -53,7 +53,7 @@ export interface Medicine extends Models.Document {
   expiryDate: string;
 }
 
-export interface Order extends Models.Document {
+export interface Order extends LegacyDocumentFields {
   userId: string;
   patientId: string;
   status: "pending" | "confirmed" | "delivered" | "cancelled";
@@ -64,7 +64,7 @@ export interface Order extends Models.Document {
   notes?: string;
 }
 
-export interface OrderItem extends Models.Document {
+export interface OrderItem extends LegacyDocumentFields {
   orderId: string;
   medicineId: string;
   medicineName: string;

@@ -1,171 +1,77 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ID, Query } from "node-appwrite";
-
 import { Appointment } from "@/types/appwrite.types";
-
-import {
-  APPOINTMENT_COLLECTION_ID,
-  DATABASE_ID,
-  databases,
-  messaging,
-} from "../appwrite.config";
 import { formatDateTime, parseStringify } from "../utils";
+import { getSupabaseAdmin } from "../supabase";
 
-//  CREATE APPOINTMENT
-export const createAppointment = async (
-  appointment: CreateAppointmentParams
-) => {
+const fromAppointment = (row: any) => ({
+  ...row, $id: row.id, userId: row.user_id,
+  patient: row.patients ? { ...row.patients, $id: row.patients.id, userId: row.patients.user_id } : { $id: row.patient_id },
+  primaryPhysician: row.primary_physician, schedule: row.schedule,
+  cancellationReason: row.cancellation_reason, $createdAt: row.created_at, $updatedAt: row.updated_at,
+});
+
+export const createAppointment = async (appointment: CreateAppointmentParams) => {
   try {
-    const newAppointment = await databases.createDocument(
-      DATABASE_ID!,
-      APPOINTMENT_COLLECTION_ID!,
-      ID.unique(),
-      appointment
-    );
-
+    const { data: patient, error: patientError } = await getSupabaseAdmin().from("patients").select("id").eq("id", appointment.patient).maybeSingle();
+    if (patientError || !patient) return null;
+    const { data, error } = await getSupabaseAdmin().from("appointments").insert({
+      user_id: appointment.userId, patient_id: patient.id,
+      primary_physician: appointment.primaryPhysician, reason: appointment.reason,
+      schedule: new Date(appointment.schedule).toISOString(), status: appointment.status || "pending", note: appointment.note || null,
+    }).select().single();
+    if (error) throw error;
     revalidatePath("/admin");
-    return parseStringify(newAppointment);
-  } catch (error) {
-    console.error("An error occurred while creating a new appointment:", error);
-  }
+    return parseStringify(fromAppointment(data));
+  } catch (error) { console.error("Appointment booking failed:", error); return null; }
 };
 
-//  GET RECENT APPOINTMENTS
 export const getRecentAppointmentList = async () => {
   try {
-    const appointments = await databases.listDocuments(
-      DATABASE_ID!,
-      APPOINTMENT_COLLECTION_ID!,
-      [Query.orderDesc("$createdAt")]
-    );
-
-    // const scheduledAppointments = (
-    //   appointments.documents as Appointment[]
-    // ).filter((appointment) => appointment.status === "scheduled");
-
-    // const pendingAppointments = (
-    //   appointments.documents as Appointment[]
-    // ).filter((appointment) => appointment.status === "pending");
-
-    // const cancelledAppointments = (
-    //   appointments.documents as Appointment[]
-    // ).filter((appointment) => appointment.status === "cancelled");
-
-    // const data = {
-    //   totalCount: appointments.total,
-    //   scheduledCount: scheduledAppointments.length,
-    //   pendingCount: pendingAppointments.length,
-    //   cancelledCount: cancelledAppointments.length,
-    //   documents: appointments.documents,
-    // };
-
-    const initialCounts = {
-      scheduledCount: 0,
-      pendingCount: 0,
-      cancelledCount: 0,
-    };
-
-    const counts = (appointments.documents as Appointment[]).reduce(
-      (acc, appointment) => {
-        switch (appointment.status) {
-          case "scheduled":
-            acc.scheduledCount++;
-            break;
-          case "pending":
-            acc.pendingCount++;
-            break;
-          case "cancelled":
-            acc.cancelledCount++;
-            break;
-        }
-        return acc;
-      },
-      initialCounts
-    );
-
-    const data = {
-      totalCount: appointments.total,
-      ...counts,
-      documents: appointments.documents,
-    };
-
-    return parseStringify(data);
+    const { data, error, count } = await getSupabaseAdmin().from("appointments").select("*, patients(*)", { count: "exact" }).order("created_at", { ascending: false });
+    if (error) throw error;
+    const documents = (data ?? []).map(fromAppointment);
+    return parseStringify({
+      totalCount: count ?? documents.length,
+      scheduledCount: documents.filter((a) => a.status === "scheduled").length,
+      pendingCount: documents.filter((a) => a.status === "pending").length,
+      cancelledCount: documents.filter((a) => a.status === "cancelled").length,
+      documents,
+    });
   } catch (error) {
-    console.error(
-      "An error occurred while retrieving the recent appointments:",
-      error
-    );
-    return {
-      totalCount: 0,
-      scheduledCount: 0,
-      pendingCount: 0,
-      cancelledCount: 0,
-      documents: [],
-    };
+    console.error("Could not fetch appointments:", error);
+    return { totalCount: 0, scheduledCount: 0, pendingCount: 0, cancelledCount: 0, documents: [] };
   }
 };
 
-//  SEND SMS NOTIFICATION
-export const sendSMSNotification = async (userId: string, content: string) => {
+// SMS delivery is not configured in the new stack. Appointment booking and
+// status changes succeed without blocking on an unavailable messaging vendor.
+export const sendSMSNotification = async (_userId: string, _content: string) => ({ skipped: true, reason: "SMS provider is not configured." });
+
+export const updateAppointment = async ({ appointmentId, appointment, type, userId }: UpdateAppointmentParams) => {
   try {
-    // https://appwrite.io/docs/references/1.5.x/server-nodejs/messaging#createSms
-    const message = await messaging.createSms(
-      ID.unique(),
-      content,
-      [],
-      [userId]
-    );
-    return parseStringify(message);
-  } catch (error) {
-    console.error("An error occurred while sending sms:", error);
-  }
-};
-
-//  UPDATE APPOINTMENT
-export const updateAppointment = async ({
-  appointmentId,
-  userId,
-  appointment,
-  type,
-}: UpdateAppointmentParams) => {
-  try {
-    // Update appointment to scheduled -> https://appwrite.io/docs/references/cloud/server-nodejs/databases#updateDocument
-    const updatedAppointment = await databases.updateDocument(
-      DATABASE_ID!,
-      APPOINTMENT_COLLECTION_ID!,
-      appointmentId,
-      appointment
-    );
-
-    if (!updatedAppointment) throw Error;
-
-    const smsMessage = `Greetings from CarePulse. ${type === "schedule" ? `Your appointment is confirmed for ${formatDateTime(appointment.schedule!).dateTime} with Dr. ${appointment.primaryPhysician}` : `We regret to inform that your appointment for ${formatDateTime(appointment.schedule!).dateTime} is cancelled. Reason:  ${appointment.cancellationReason}`}.`;
+    const schedule = appointment.schedule ? new Date(appointment.schedule).toISOString() : undefined;
+    const { data, error } = await getSupabaseAdmin().from("appointments").update({
+      status: type === "schedule" ? "scheduled" : "cancelled",
+      ...(schedule && { schedule }),
+      primary_physician: appointment.primaryPhysician,
+      note: appointment.note,
+      cancellation_reason: appointment.cancellationReason,
+    }).eq("id", appointmentId).select().single();
+    if (error) throw error;
+    const when = schedule ? formatDateTime(schedule).dateTime : "the scheduled time";
+    const smsMessage = type === "schedule"
+      ? `Your appointment is confirmed for ${when} with Dr. ${appointment.primaryPhysician}.`
+      : `Your appointment for ${when} was cancelled. ${appointment.cancellationReason ?? ""}`;
     await sendSMSNotification(userId, smsMessage);
-
     revalidatePath("/admin");
-    return parseStringify(updatedAppointment);
-  } catch (error) {
-    console.error("An error occurred while scheduling an appointment:", error);
-  }
+    return parseStringify(fromAppointment(data));
+  } catch (error) { console.error("Appointment update failed:", error); return null; }
 };
 
-// GET APPOINTMENT
 export const getAppointment = async (appointmentId: string) => {
-  try {
-    const appointment = await databases.getDocument(
-      DATABASE_ID!,
-      APPOINTMENT_COLLECTION_ID!,
-      appointmentId
-    );
-
-    return parseStringify(appointment);
-  } catch (error) {
-    console.error(
-      "An error occurred while retrieving the existing patient:",
-      error
-    );
-  }
+  const { data, error } = await getSupabaseAdmin().from("appointments").select("*, patients(*)").eq("id", appointmentId).maybeSingle();
+  if (error) { console.error("Could not retrieve appointment:", error); return null; }
+  return data ? parseStringify(fromAppointment(data)) as Appointment : null;
 };
-

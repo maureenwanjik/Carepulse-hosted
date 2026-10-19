@@ -38,7 +38,7 @@ const SuccessPage = async ({
     totalAmount,
   } = session.metadata ?? {}
 
-  // ── Save order to Appwrite (only if not already saved) ───────────────────
+  // Save the paid order to Supabase after Stripe confirms payment.
   // We use the Stripe session ID as a idempotency check via notes field
   if (userId && patientId && cartItemsJson) {
     try {

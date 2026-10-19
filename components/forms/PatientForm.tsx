@@ -86,7 +86,8 @@ const SignUpForm = ({ onSwitch }: { onSwitch: (mode: AuthMode) => void }) => {
         phone: values.phone,
         password: values.password,
       });
-      if (newUser) router.push(`/patients/${newUser.$id}/register`);
+      if (newUser && "error" in newUser) setError(newUser.error);
+      else if (newUser) router.push(`/patients/${newUser.$id}/register`);
       else setError("Could not create account. Please try again.");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -162,10 +163,12 @@ const LoginForm = ({ onSwitch }: { onSwitch: (mode: AuthMode) => void }) => {
     setError("");
     try {
       const result = await loginUser(values.email, values.password);
-      if (result?.error) {
+      if (result && "error" in result) {
         setError(result.error);
-      } else {
+      } else if (result) {
         router.push("/dashboard");
+      } else {
+        setError("Could not sign in. Please try again.");
       }
     } catch {
       setError("Something went wrong. Please try again.");

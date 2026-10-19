@@ -30,7 +30,7 @@ const MedicinePage: React.FC = () => {
     let active = true
     const timeout = window.setTimeout(() => {
       if (!active) return
-      setError('Appwrite is taking too long to respond. Check your connection and try again.')
+      setError('The medicine service is taking too long to respond. Please try again.')
       setLoading(false)
     }, 15000)
 
@@ -42,7 +42,7 @@ const MedicinePage: React.FC = () => {
       })
       .catch((err) => {
         console.error('Failed to fetch medicines:', err)
-        if (active) setError(err instanceof Error ? err.message : 'Could not load medicines from Appwrite.')
+        if (active) setError(err instanceof Error ? err.message : 'Could not load medicines right now.')
       })
       .finally(() => {
         window.clearTimeout(timeout)

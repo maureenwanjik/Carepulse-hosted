@@ -1,238 +1,173 @@
 "use server";
 
-import { ID, Query } from "node-appwrite";
-import { InputFile } from "node-appwrite/file";
-import {
-  BUCKET_ID,
-  DATABASE_ID,
-  ENDPOINT,
-  PATIENT_COLLECTION_ID,
-  PROJECT_ID,
-  databases,
-  storage,
-  users,
-} from "../appwrite.config";
-import { parseStringify } from "../utils";
 import { cookies } from "next/headers";
+import { getSupabaseAdmin, getSupabasePublic, PRIVATE_DOCUMENT_BUCKET } from "../supabase";
 
-// ─── Helper: set auth cookie ──────────────────────────────────────────────────
-const setAuthCookie = (userId: string) => {
-  cookies().set("userId", userId, {
-    httpOnly: true,
-    path: "/",
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 7, // 7 days
-  });
+const setSessionCookies = (userId: string, accessToken?: string, refreshToken?: string) => {
+  const secure = process.env.NODE_ENV === "production";
+  cookies().set("userId", userId, { httpOnly: true, path: "/", secure, sameSite: "lax", maxAge: 60 * 60 * 24 * 7 });
+  if (accessToken) cookies().set("sb-access-token", accessToken, { httpOnly: true, path: "/", secure, sameSite: "lax", maxAge: 60 * 60 });
+  if (refreshToken) cookies().set("sb-refresh-token", refreshToken, { httpOnly: true, path: "/", secure, sameSite: "lax", maxAge: 60 * 60 * 24 * 7 });
 };
 
-// ─── CREATE USER (Sign Up with password) ─────────────────────────────────────
+const toUser = (user: any) => ({
+  $id: user.id,
+  name: user.user_metadata?.name ?? user.email?.split("@")[0] ?? "Patient",
+  email: user.email ?? "",
+  phone: user.phone || user.user_metadata?.phone || "",
+});
+
 export const createUser = async (user: CreateUserParams & { password: string }) => {
   try {
-    const newUser = await users.create(
-      ID.unique(),
-      user.email,
-      user.phone,
-      user.password,  // ✅ password included
-      user.name
-    );
-
-    setAuthCookie(newUser.$id);
-    return parseStringify(newUser);
-  } catch (error: any) {
-    if (error?.code === 409) {
-      // User already exists — return existing user
-      const existingUser = await users.list([
-        Query.equal("email", [user.email]),
-      ]);
-      const found = existingUser.users[0];
-      setAuthCookie(found.$id);
-      return parseStringify(found);
-    }
-    console.error("An error occurred while creating a new user:", error);
+    const { data, error } = await getSupabasePublic().auth.signUp({
+      email: user.email,
+      password: user.password,
+      options: { data: { name: user.name, phone: user.phone } },
+    });
+    if (error) return { error: error.message };
+    if (!data.user) return { error: "Account could not be created. Please try again." };
+    if (data.session) setSessionCookies(data.user.id, data.session.access_token, data.session.refresh_token);
+    else cookies().set("userId", data.user.id, { httpOnly: true, path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 });
+    return toUser(data.user);
+  } catch (error) {
+    console.error("Account creation failed:", error);
+    return { error: error instanceof Error ? error.message : "Account creation failed." };
   }
 };
 
-// ─── LOGIN USER (email + password) ───────────────────────────────────────────
 export const loginUser = async (email: string, password: string) => {
   try {
-    // Find user by email
-    const result = await users.list([Query.equal("email", [email])]);
-
-    if (result.users.length === 0) {
-      return { error: "No account found with that email." };
-    }
-
-    const user = result.users[0];
-
-    // Verify password using Appwrite's bcrypt check
-    // node-appwrite admin SDK doesn't expose password check directly,
-    // so we verify by attempting to update with same password (no-op check)
-    // Instead: use Appwrite account session via client SDK for real password check.
-    // For now with admin SDK: trust the password exists and set cookie.
-    // TODO: Replace with Appwrite client-side session for full password verification.
-
-    setAuthCookie(user.$id);
-    return parseStringify(user);
+    const { data, error } = await getSupabasePublic().auth.signInWithPassword({ email, password });
+    if (error || !data.user || !data.session) return { error: error?.message ?? "Login failed." };
+    setSessionCookies(data.user.id, data.session.access_token, data.session.refresh_token);
+    return toUser(data.user);
   } catch (error) {
-    console.error("An error occurred while logging in:", error);
-    return { error: "Something went wrong. Please try again." };
+    console.error("Login failed:", error);
+    return { error: "Could not connect to the account service. Please try again." };
   }
 };
 
-// ─── LOGOUT ───────────────────────────────────────────────────────────────────
 export const logoutUser = async () => {
   cookies().delete("userId");
+  cookies().delete("sb-access-token");
+  cookies().delete("sb-refresh-token");
 };
 
-// ─── FORGOT PASSWORD — send OTP via email ────────────────────────────────────
 export const sendPasswordResetOTP = async (email: string) => {
   try {
-    const result = await users.list([Query.equal("email", [email])]);
-
-    if (result.users.length === 0) {
-      // Don't reveal if email exists — security best practice
-      return { success: true };
-    }
-
-    const user = result.users[0];
-
-    // Generate a 6-digit OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiry = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min
-
-    // Store OTP in a temporary cookie (httpOnly, short-lived)
-    cookies().set("reset_otp", JSON.stringify({ otp, email, expiry: otpExpiry }), {
-      httpOnly: true,
-      path: "/",
-      maxAge: 60 * 15, // 15 minutes
-    });
-
-    // Send OTP via Appwrite messaging (email)
-    // Note: Requires Appwrite Messaging set up with an email provider
-    // For now log it — replace with your email provider
-    console.log(`Password reset OTP for ${email}: ${otp}`);
-
-    // TODO: Replace console.log with actual email sending:
-    // await messaging.createEmail(
-    //   ID.unique(),
-    //   "Password Reset OTP",
-    //   `Your CarePulse password reset code is: ${otp}. It expires in 15 minutes.`,
-    //   [], [], [user.$id]
-    // );
-
+    const { error } = await getSupabasePublic().auth.resetPasswordForEmail(email);
+    if (error) return { error: error.message };
     return { success: true };
   } catch (error) {
-    console.error("Error sending OTP:", error);
-    return { error: "Failed to send OTP. Please try again." };
+    console.error("Password reset request failed:", error);
+    return { error: "Could not send a password reset code. Please try again." };
   }
 };
 
-// ─── RESET PASSWORD — verify OTP + set new password ──────────────────────────
-export const resetPassword = async (
-  email: string,
-  otp: string,
-  newPassword: string
-) => {
+export const resetPassword = async (email: string, otp: string, newPassword: string) => {
   try {
-    // Retrieve stored OTP from cookie
-    const stored = cookies().get("reset_otp")?.value;
-    if (!stored) return { error: "OTP expired. Please request a new one." };
-
-    const { otp: storedOtp, email: storedEmail, expiry } = JSON.parse(stored);
-
-    // Validate OTP
-    if (storedEmail !== email) return { error: "Invalid request." };
-    if (new Date() > new Date(expiry)) return { error: "OTP has expired. Please request a new one." };
-    if (storedOtp !== otp) return { error: "Incorrect OTP. Please try again." };
-
-    // Find user and update password
-    const result = await users.list([Query.equal("email", [email])]);
-    if (result.users.length === 0) return { error: "User not found." };
-
-    const user = result.users[0];
-    await users.updatePassword(user.$id, newPassword);
-
-    // Clear OTP cookie
+    const client = getSupabasePublic();
+    const { data, error } = await client.auth.verifyOtp({ email, token: otp, type: "recovery" });
+    if (error || !data.user) return { error: error?.message ?? "Invalid or expired reset code." };
+    const { error: updateError } = await client.auth.updateUser({ password: newPassword });
+    if (updateError) return { error: updateError.message };
     cookies().delete("reset_otp");
-
     return { success: true };
   } catch (error) {
-    console.error("Error resetting password:", error);
-    return { error: "Failed to reset password. Please try again." };
+    console.error("Password reset failed:", error);
+    return { error: "Password reset failed. Please try again." };
   }
 };
 
-// ─── GET USER ─────────────────────────────────────────────────────────────────
 export const getUser = async (userId: string) => {
   try {
-    const user = await users.get(userId);
-    return parseStringify(user);
+    const { data, error } = await getSupabaseAdmin().auth.admin.getUserById(userId);
+    if (error || !data.user) return null;
+    return toUser(data.user);
   } catch (error) {
-    console.error("An error occurred while retrieving the user details:", error);
+    console.error("Could not retrieve account:", error);
+    return null;
   }
 };
 
-// ─── REGISTER PATIENT ─────────────────────────────────────────────────────────
-export const registerPatient = async ({
-  identificationDocument,
-  ...patient
-}: RegisterUserParams) => {
+export const registerPatient = async ({ identificationDocument, ...patient }: RegisterUserParams) => {
   try {
-     // ✅ Check if patient already exists for this userId
-    const existing = await databases.listDocuments(
-      DATABASE_ID!,
-      PATIENT_COLLECTION_ID!,
-      [Query.equal("userId", [patient.userId])]
-    );
+    const supabase = getSupabaseAdmin();
+    const { data: existing, error: lookupError } = await supabase.from("patients").select("*").eq("user_id", patient.userId).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (existing) return { ...existing, $id: existing.id, userId: existing.user_id };
 
-    // ✅ If already registered, return existing record instead of creating new
-    if (existing.documents.length > 0) {
-      return parseStringify(existing.documents[0]);
-    }
-    
-    let file;
+    let documentPath: string | null = null;
     if (identificationDocument) {
-      const blob = identificationDocument.get("blobFile") as Blob;
-      const fileName = identificationDocument.get("fileName") as string;
-
-      if (blob && fileName) {
-        const inputFile = InputFile.fromBuffer(blob, fileName);
-        file = await storage.createFile(BUCKET_ID!, ID.unique(), inputFile);
+      const file = identificationDocument.get("blobFile") as Blob | null;
+      const name = identificationDocument.get("fileName") as string | null;
+      if (file && name) {
+        const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        documentPath = `${patient.userId}/${Date.now()}-${safeName}`;
+        const { error } = await supabase.storage.from(PRIVATE_DOCUMENT_BUCKET).upload(documentPath, file, { contentType: file.type || "application/octet-stream", upsert: false });
+        if (error) throw error;
       }
     }
 
-    const newPatient = await databases.createDocument(
-      DATABASE_ID!,
-      PATIENT_COLLECTION_ID!,
-      ID.unique(),
-      {
-        identificationDocumentId: file?.$id ?? null,
-        identificationDocumentUrl: file?.$id
-          ? `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${file.$id}/view?project=${PROJECT_ID}`
-          : null,
-        ...patient,
-      }
-    );
+    const { data: profile, error: profileError } = await supabase.from("profiles").upsert({
+      id: patient.userId, name: patient.name, phone: patient.phone,
+    }).select().single();
+    if (profileError) throw profileError;
 
-    return parseStringify(newPatient);
+    const { data, error } = await supabase.from("patients").insert({
+      user_id: patient.userId,
+      name: patient.name,
+      email: patient.email,
+      phone: patient.phone,
+      birth_date: patient.birthDate ? new Date(patient.birthDate).toISOString().slice(0, 10) : null,
+      gender: patient.gender,
+      address: patient.address,
+      occupation: patient.occupation,
+      emergency_contact_name: patient.emergencyContactName,
+      emergency_contact_number: patient.emergencyContactNumber,
+      primary_physician: patient.primaryPhysician,
+      insurance_provider: patient.insuranceProvider,
+      insurance_policy_number: patient.insurancePolicyNumber,
+      allergies: patient.allergies || null,
+      current_medication: patient.currentMedication || null,
+      family_medical_history: patient.familyMedicalHistory || null,
+      past_medical_history: patient.pastMedicalHistory || null,
+      identification_type: patient.identificationType || null,
+      identification_number: patient.identificationNumber || null,
+      identification_document_path: documentPath,
+      privacy_consent: patient.privacyConsent,
+    }).select().single();
+    if (error) throw error;
+    return { ...data, $id: data.id, userId: data.user_id, identificationDocumentUrl: null };
   } catch (error) {
-    console.error("An error occurred while creating a new patient:", error);
+    console.error("Patient registration failed:", error);
+    return null;
   }
 };
 
-// ─── GET PATIENT ──────────────────────────────────────────────────────────────
 export const getPatient = async (userId: string) => {
   try {
-    const patients = await databases.listDocuments(
-      DATABASE_ID!,
-      PATIENT_COLLECTION_ID!,
-      [Query.equal("userId", [userId])]
-    );
-    return parseStringify(patients.documents[0]);
+    const { data, error } = await getSupabaseAdmin().from("patients").select("*").eq("user_id", userId).maybeSingle();
+    if (error) throw error;
+    return data ? {
+      ...data,
+      $id: data.id,
+      userId: data.user_id,
+      birthDate: data.birth_date,
+      emergencyContactName: data.emergency_contact_name,
+      emergencyContactNumber: data.emergency_contact_number,
+      primaryPhysician: data.primary_physician,
+      insuranceProvider: data.insurance_provider,
+      insurancePolicyNumber: data.insurance_policy_number,
+      currentMedication: data.current_medication,
+      familyMedicalHistory: data.family_medical_history,
+      pastMedicalHistory: data.past_medical_history,
+      identificationType: data.identification_type,
+      identificationNumber: data.identification_number,
+      identificationDocumentPath: data.identification_document_path,
+    } : null;
   } catch (error) {
-    console.error("An error occurred while retrieving the patient details:", error);
+    console.error("Could not retrieve patient:", error);
+    return null;
   }
 };
-
-

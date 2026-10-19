@@ -1,180 +1,73 @@
-//lib/actions/order.actions.ts
-
 "use server";
 
-import { ID, Query } from "node-appwrite";
-import { DATABASE_ID, PATIENT_COLLECTION_ID, databases } from "../appwrite.config";
+import { getSupabaseAdmin } from "../supabase";
 import { parseStringify } from "../utils";
 
-const ORDERS_COLLECTION_ID = process.env.APPWRITE_ORDERS_COLLECTION_ID!;
-const ORDER_ITEMS_COLLECTION_ID = process.env.APPWRITE_ORDER_ITEMS_COLLECTION_ID!;
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export type CreateOrderParams = {
-  userId: string;
-  patientId: string;
-  cartItems: {
-    medicineId: string;
-    medicineName: string;
-    quantity: number;
-    unitPrice: number;
-  }[];
-  totalAmount: number;
-  deliveryAddress: string;
-  paymentMethod: string;
-  paymentStatus?: string;
-  notes?: string;
+  userId: string; patientId: string;
+  cartItems: { medicineId: string; medicineName: string; quantity: number; unitPrice: number }[];
+  totalAmount: number; deliveryAddress: string; paymentMethod: string; paymentStatus?: string; notes?: string;
 };
+export type OrderStatus = "pending" | "confirmed" | "out_for_delivery" | "delivered" | "cancelled";
 
-export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "out_for_delivery"
-  | "delivered"
-  | "cancelled";
+const fromOrder = (row: any) => ({
+  ...row, $id: row.id, userId: row.user_id, patientId: row.patient_id,
+  totalAmount: Number(row.total_amount), deliveryAddress: row.delivery_address,
+  paymentMethod: row.payment_method, paymentStatus: row.payment_status,
+  $createdAt: row.created_at, $updatedAt: row.updated_at,
+});
 
-// ─── CREATE ORDER ─────────────────────────────────────────────────────────────
-export const createOrder = async ({
-  userId,
-  patientId,
-  cartItems,
-  totalAmount,
-  deliveryAddress,
-  paymentMethod,
-  paymentStatus = "unpaid",
-  notes,
-}: CreateOrderParams) => {
+export const createOrder = async (params: CreateOrderParams) => {
+  const supabase = getSupabaseAdmin();
+  const { userId, patientId, cartItems, totalAmount, deliveryAddress, paymentMethod, paymentStatus = "unpaid", notes = "" } = params;
+  if (!cartItems.length || cartItems.some((item) => item.quantity < 1 || item.unitPrice < 0)) return null;
   try {
-    // ✅ Create order — link to patient via relationship
-    const order = await databases.createDocument(
-      DATABASE_ID!,
-      ORDERS_COLLECTION_ID,
-      ID.unique(),
-      {
-        userId,
-        patient: patientId,   // ← relationship field (links to patient document)
-        status: "pending",
-        totalAmount,
-        deliveryAddress,
-        paymentMethod,
-        paymentStatus,
-        notes: notes ?? "",
-      }
-    );
-
-    // ✅ Create order items linked by orderId string
-    await Promise.all(
-      cartItems.map((item) =>
-        databases.createDocument(
-          DATABASE_ID!,
-          ORDER_ITEMS_COLLECTION_ID,
-          ID.unique(),
-          {
-            orderId: order.$id,
-            medicineId: item.medicineId,
-            medicineName: item.medicineName,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            subtotal: item.quantity * item.unitPrice,
-          }
-        )
-      )
-    );
-
-    return parseStringify(order);
-  } catch (error) {
-    console.error("Failed to create order:", JSON.stringify(error, null, 2));
-    return null;
-  }
+    const { data: order, error } = await supabase.from("orders").insert({
+      user_id: userId, patient_id: patientId, status: "pending", total_amount: totalAmount,
+      delivery_address: deliveryAddress, payment_method: paymentMethod,
+      payment_status: paymentStatus === "paid" ? "paid" : "unpaid", notes,
+    }).select().single();
+    if (error) throw error;
+    const { error: itemsError } = await supabase.from("order_items").insert(cartItems.map((item) => ({
+      order_id: order.id, medicine_id: item.medicineId || null, medicine_name: item.medicineName,
+      quantity: item.quantity, unit_price: item.unitPrice, subtotal: item.quantity * item.unitPrice,
+    })));
+    if (itemsError) {
+      await supabase.from("orders").delete().eq("id", order.id);
+      throw itemsError;
+    }
+    return parseStringify(fromOrder(order));
+  } catch (error) { console.error("Failed to create order:", error); return null; }
 };
 
-// ─── GET ALL ORDERS (Admin) ───────────────────────────────────────────────────
-// Returns all orders with patient data via relationship
 export const getAllOrders = async () => {
   try {
-    const orders = await databases.listDocuments(
-      DATABASE_ID!,
-      ORDERS_COLLECTION_ID,
-      [Query.orderDesc("$createdAt")]
-    );
-    return parseStringify(orders.documents);
-  } catch (error) {
-    console.error("Failed to fetch all orders:", JSON.stringify(error, null, 2));
-    return [];
-  }
+    const { data, error } = await getSupabaseAdmin().from("orders").select("*, order_items(*), patients(name,email,phone)").order("created_at", { ascending: false });
+    if (error) throw error;
+    return parseStringify((data ?? []).map(fromOrder));
+  } catch (error) { console.error("Failed to fetch orders:", error); return []; }
 };
 
-// ─── GET PATIENT ORDERS ───────────────────────────────────────────────────────
-// Returns orders for a specific patient
 export const getPatientOrders = async (userId: string) => {
   try {
-    const orders = await databases.listDocuments(
-      DATABASE_ID!,
-      ORDERS_COLLECTION_ID,
-      [
-        Query.equal("userId", [userId]),
-        Query.orderDesc("$createdAt"),
-      ]
-    );
-    return parseStringify(orders.documents);
-  } catch (error) {
-    console.error("Failed to fetch patient orders:", JSON.stringify(error, null, 2));
-    return [];
-  }
+    const { data, error } = await getSupabaseAdmin().from("orders").select("*, order_items(*)").eq("user_id", userId).order("created_at", { ascending: false });
+    if (error) throw error;
+    return parseStringify((data ?? []).map(fromOrder));
+  } catch (error) { console.error("Failed to fetch patient orders:", error); return []; }
 };
 
-// ─── GET ORDER ITEMS ──────────────────────────────────────────────────────────
-// Returns all items for a specific order
 export const getOrderItems = async (orderId: string) => {
-  try {
-    const items = await databases.listDocuments(
-      DATABASE_ID!,
-      ORDER_ITEMS_COLLECTION_ID,
-      [Query.equal("orderId", [orderId])]
-    );
-    return parseStringify(items.documents);
-  } catch (error) {
-    console.error("Failed to fetch order items:", JSON.stringify(error, null, 2));
-    return [];
-  }
+  const { data, error } = await getSupabaseAdmin().from("order_items").select("*").eq("order_id", orderId).order("created_at");
+  if (error) { console.error("Failed to fetch order items:", error); return []; }
+  return parseStringify((data ?? []).map((item) => ({ ...item, $id: item.id, orderId: item.order_id, medicineId: item.medicine_id, medicineName: item.medicine_name, unitPrice: Number(item.unit_price) })));
 };
 
-// ─── UPDATE ORDER STATUS (Admin) ──────────────────────────────────────────────
-export const updateOrderStatus = async (
-  orderId: string,
-  status: OrderStatus,
-  paymentStatus?: "unpaid" | "paid"
-) => {
-  try {
-    const updates: Record<string, string> = { status };
-    if (paymentStatus) updates.paymentStatus = paymentStatus;
-
-    const updated = await databases.updateDocument(
-      DATABASE_ID!,
-      ORDERS_COLLECTION_ID,
-      orderId,
-      updates
-    );
-    return parseStringify(updated);
-  } catch (error) {
-    console.error("Failed to update order status:", JSON.stringify(error, null, 2));
-    return null;
-  }
+export const updateOrderStatus = async (orderId: string, status: OrderStatus, paymentStatus?: "unpaid" | "paid") => {
+  const updates: Record<string, string> = { status };
+  if (paymentStatus) updates.payment_status = paymentStatus;
+  const { data, error } = await getSupabaseAdmin().from("orders").update(updates).eq("id", orderId).select().single();
+  if (error) { console.error("Failed to update order status:", error); return null; }
+  return parseStringify(fromOrder(data));
 };
 
-// ─── CANCEL ORDER ─────────────────────────────────────────────────────────────
-export const cancelOrder = async (orderId: string) => {
-  try {
-    const updated = await databases.updateDocument(
-      DATABASE_ID!,
-      ORDERS_COLLECTION_ID,
-      orderId,
-      { status: "cancelled" }
-    );
-    return parseStringify(updated);
-  } catch (error) {
-    console.error("Failed to cancel order:", JSON.stringify(error, null, 2));
-    return null;
-  }
-};
+export const cancelOrder = async (orderId: string) => updateOrderStatus(orderId, "cancelled");

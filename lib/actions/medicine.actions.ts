@@ -1,20 +1,9 @@
 "use server";
 
-import { ID, Query } from "node-appwrite";
-import { InputFile } from "node-appwrite/file";
-import {
-  BUCKET_ID,
-  DATABASE_ID,
-  ENDPOINT,
-  MEDICINE_ID,
-  PROJECT_ID,
-  databases,
-  storage,
-} from "../appwrite.config";
-import { parseStringify } from "../utils";
+import { del, put } from "@vercel/blob";
+import { revalidatePath } from "next/cache";
+import { getSupabaseAdmin } from "../supabase";
 import { Medicine } from "@/types/appwrite.types";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type CreateMedicineParams = {
   medicineName: string;
@@ -27,229 +16,109 @@ export type CreateMedicineParams = {
   requiresPrescription: boolean;
   manufacturer: string;
   expiryDate: string;
-  imageFile?: FormData; // ✅ matches patient pattern
-};
-
-export type UpdateMedicineParams = Partial<Omit<CreateMedicineParams, "imageFile">> & {
   imageFile?: FormData;
 };
+export type UpdateMedicineParams = Partial<Omit<CreateMedicineParams, "imageFile">> & { imageFile?: FormData };
 
-const getAppwriteFetchError = (error: unknown, subject: string): Error => {
-  const appwriteError = error as {
-    type?: string;
-    response?: { type?: string };
-  };
-  if (appwriteError?.type === "project_paused" || appwriteError?.response?.type === "project_paused") {
-    return new Error("The Appwrite project is paused. Restore it in the Appwrite Console to load medicine products.");
-  }
+const toMedicine = (row: any): Medicine => ({
+  ...row,
+  $id: row.id,
+  medicineId: row.medicine_id || row.id,
+  medicineName: row.medicine_name,
+  medicineImageId: null,
+  medicineImageUrl: row.image_path,
+  requiresPrescription: row.requires_prescription,
+  expiryDate: row.expiry_date,
+  $createdAt: row.created_at,
+  $updatedAt: row.updated_at,
+} as Medicine);
 
-  const cause = error instanceof Error ? (error as Error & { cause?: { code?: string } }).cause : undefined;
-  if (cause?.code === "UND_ERR_CONNECT_TIMEOUT" || (error instanceof Error && error.message === "fetch failed")) {
-    return new Error(`Could not connect to Appwrite to load ${subject}. Check internet/firewall access to the configured Appwrite endpoint and confirm the endpoint URL is correct.`);
-  }
-  return new Error(`Could not load ${subject} from Appwrite. Check the database, collection, and read permissions, then try again.`);
+const uploadImage = async (form?: FormData) => {
+  if (!form) return undefined;
+  const file = form.get("blobFile");
+  const name = form.get("fileName");
+  if (!(file instanceof Blob) || typeof name !== "string") return undefined;
+  const safeName = name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const blob = await put(`medicines/${Date.now()}-${safeName}`, file, { access: "public", addRandomSuffix: true });
+  return blob.url;
 };
 
-// ─── LIST MEDICINES ───────────────────────────────────────────────────────────
 export const listMedicines = async (): Promise<Medicine[]> => {
-  try {
-    if (!DATABASE_ID || !MEDICINE_ID) {
-      throw new Error("Appwrite medicine collection is not configured (DATABASE_ID or MEDICINE_ID is missing).");
-    }
-    const response = await databases.listDocuments<Medicine>(
-      DATABASE_ID!,
-      MEDICINE_ID!
-    );
-    const medicines = parseStringify(response.documents) as Medicine[];
-    return medicines.sort((a, b) => a.medicineName.localeCompare(b.medicineName));
-  } catch (error) {
+  const { data, error } = await getSupabaseAdmin().from("medicines").select("*").order("medicine_name");
+  if (error) throw new Error(`Could not load medicines: ${error.message}`);
+  return (data ?? []).map(toMedicine);
+};
+
+export const listMedicinesForStore = async () => {
+  try { return { medicines: await listMedicines() }; }
+  catch (error) {
     console.error("Failed to list medicines:", error);
-    throw getAppwriteFetchError(error, "medicines");
+    return { medicines: [], error: "The medicine catalogue is temporarily unavailable." };
   }
 };
 
-// Client-facing listing action returns an error as data so an Appwrite outage
-// does not turn the entire production page into a Server Components error.
-export const listMedicinesForStore = async (): Promise<{
-  medicines: Medicine[];
-  error?: string;
-}> => {
-  try {
-    return { medicines: await listMedicines() };
-  } catch (error) {
-    return {
-      medicines: [],
-      error: error instanceof Error ? error.message : "Could not load medicines from Appwrite.",
-    };
-  }
-};
-
-// ─── GET MEDICINE BY ID ───────────────────────────────────────────────────────
 export const getMedicineById = async (id: string): Promise<Medicine | null> => {
-  try {
-    const medicine = await databases.getDocument<Medicine>(
-      DATABASE_ID!,
-      MEDICINE_ID!,
-      id
-    );
-    return parseStringify(medicine);
-  } catch (error) {
-    console.error(`Failed to retrieve medicine (id: ${id}):`, error);
-    throw getAppwriteFetchError(error, "this medicine");
-  }
+  const { data, error } = await getSupabaseAdmin().from("medicines").select("*").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data ? toMedicine(data) : null;
 };
 
-// ─── GET MEDICINES BY CATEGORY ────────────────────────────────────────────────
 export const getMedicinesByCategory = async (category: string): Promise<Medicine[]> => {
-  try {
-    const response = await databases.listDocuments<Medicine>(
-      DATABASE_ID!,
-      MEDICINE_ID!,
-      [Query.equal("category", category), Query.orderAsc("medicineName")]
-    );
-    return parseStringify(response.documents);
-  } catch (error) {
-    console.error(`Failed to get medicines by category "${category}":`, JSON.stringify(error, null, 2));
-    return [];
-  }
+  const { data, error } = await getSupabaseAdmin().from("medicines").select("*").eq("category", category).order("medicine_name");
+  if (error) throw error;
+  return (data ?? []).map(toMedicine);
 };
 
-// ─── SEARCH MEDICINES ─────────────────────────────────────────────────────────
 export const searchMedicines = async (searchTerm: string): Promise<Medicine[]> => {
-  if (!searchTerm || searchTerm.trim().length === 0) return [];
-  if (searchTerm.trim().length > 100) return [];
-
-  try {
-    const response = await databases.listDocuments<Medicine>(
-      DATABASE_ID!,
-      MEDICINE_ID!,
-      [Query.search("medicineName", searchTerm.trim()), Query.orderAsc("medicineName")]
-    );
-    return parseStringify(response.documents);
-  } catch (error) {
-    console.error(`Failed to search medicines for "${searchTerm}":`, JSON.stringify(error, null, 2));
-    return [];
-  }
+  const term = searchTerm.trim();
+  if (!term || term.length > 100) return [];
+  const { data, error } = await getSupabaseAdmin().from("medicines").select("*").ilike("medicine_name", `%${term}%`).order("medicine_name");
+  if (error) throw error;
+  return (data ?? []).map(toMedicine);
 };
 
-// ─── CREATE MEDICINE ──────────────────────────────────────────────────────────
-export const createMedicine = async ({
-  imageFile,
-  ...medicineData
-}: CreateMedicineParams): Promise<Medicine | null> => {
-  try {
-    // ✅ Same pattern as registerPatient
-    let file;
-    if (imageFile) {
-      const blob = imageFile.get("blobFile") as Blob;
-      const fileName = imageFile.get("fileName") as string;
-
-      if (blob && fileName) {
-        const inputFile = InputFile.fromBuffer(blob, fileName);
-        file = await storage.createFile(BUCKET_ID!, ID.unique(), inputFile);
-      }
-    }
-
-    // ✅ Generate docId and use it as medicineId
-    const docId = ID.unique();
-
-    const medicine = await databases.createDocument<Medicine>(
-      DATABASE_ID!,
-      MEDICINE_ID!,
-      docId,
-      {
-        ...medicineData,
-        medicineId: docId,
-        medicineImageId: file?.$id ?? null,
-        medicineImageUrl: file?.$id
-          ? `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${file.$id}/view?project=${PROJECT_ID}`
-          : null,
-      }
-    );
-
-    return parseStringify(medicine);
-  } catch (error) {
-    console.error("Failed to create medicine:", JSON.stringify(error, null, 2));
-    return null;
+const toRow = (input: Partial<CreateMedicineParams>) => {
+  const row: Record<string, unknown> = {};
+  const fields: [keyof CreateMedicineParams, string][] = [
+    ["medicineName", "medicine_name"], ["description", "description"], ["price", "price"],
+    ["category", "category"], ["stock", "stock"], ["unit", "unit"], ["dosage", "dosage"],
+    ["requiresPrescription", "requires_prescription"], ["manufacturer", "manufacturer"], ["expiryDate", "expiry_date"],
+  ];
+  for (const [source, target] of fields) {
+    if (input[source] !== undefined) row[target] = source === "expiryDate" && input[source] === "" ? null : input[source];
   }
+  return row;
 };
 
-// ─── UPDATE MEDICINE ──────────────────────────────────────────────────────────
-export const updateMedicine = async (
-  id: string,
-  { imageFile, ...updates }: UpdateMedicineParams
-): Promise<Medicine | null> => {
+export const createMedicine = async ({ imageFile, ...medicineData }: CreateMedicineParams): Promise<Medicine | null> => {
   try {
-    let file;
-
-    if (imageFile) {
-      // ✅ Same pattern as registerPatient image upload
-      const blob = imageFile.get("blobFile") as Blob;
-      const fileName = imageFile.get("fileName") as string;
-
-      if (blob && fileName) {
-        // Upload new image first
-        const inputFile = InputFile.fromBuffer(blob, fileName);
-        file = await storage.createFile(BUCKET_ID!, ID.unique(), inputFile);
-
-        // Delete old image if it exists
-        const existing = await databases.getDocument<Medicine>(
-          DATABASE_ID!,
-          MEDICINE_ID!,
-          id
-        );
-        if (existing.medicineImageId) {
-          try {
-            await storage.deleteFile(BUCKET_ID!, existing.medicineImageId);
-          } catch {
-            console.error("Failed to delete old medicine image");
-          }
-        }
-      }
-    }
-
-    const updated = await databases.updateDocument<Medicine>(
-      DATABASE_ID!,
-      MEDICINE_ID!,
-      id,
-      {
-        ...updates,
-        ...(file?.$id && {
-          medicineImageId: file.$id,
-          medicineImageUrl: `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${file.$id}/view?project=${PROJECT_ID}`,
-        }),
-      }
-    );
-
-    return parseStringify(updated);
-  } catch (error) {
-    console.error(`Failed to update medicine (id: ${id}):`, JSON.stringify(error, null, 2));
-    return null;
-  }
+    const imageUrl = await uploadImage(imageFile);
+    const { data, error } = await getSupabaseAdmin().from("medicines").insert({ ...toRow(medicineData), image_path: imageUrl ?? null }).select().single();
+    if (error) throw error;
+    revalidatePath("/product"); revalidatePath("/admin/medicines");
+    return toMedicine(data);
+  } catch (error) { console.error("Failed to create medicine:", error); return null; }
 };
 
-// ─── DELETE MEDICINE ──────────────────────────────────────────────────────────
+export const updateMedicine = async (id: string, { imageFile, ...updates }: UpdateMedicineParams): Promise<Medicine | null> => {
+  try {
+    const row = toRow(updates);
+    if (imageFile) row.image_path = await uploadImage(imageFile);
+    const { data, error } = await getSupabaseAdmin().from("medicines").update(row).eq("id", id).select().single();
+    if (error) throw error;
+    revalidatePath("/product"); revalidatePath("/admin/medicines");
+    return toMedicine(data);
+  } catch (error) { console.error("Failed to update medicine:", error); return null; }
+};
+
 export const deleteMedicine = async (id: string): Promise<boolean> => {
   try {
-    const medicine = await databases.getDocument<Medicine>(
-      DATABASE_ID!,
-      MEDICINE_ID!,
-      id
-    );
-
-    await databases.deleteDocument(DATABASE_ID!, MEDICINE_ID!, id);
-
-    if (medicine.medicineImageId) {
-      try {
-        await storage.deleteFile(BUCKET_ID!, medicine.medicineImageId);
-      } catch {
-        console.error("Failed to delete medicine image from storage");
-      }
-    }
-
+    const supabase = getSupabaseAdmin();
+    const { data: medicine } = await supabase.from("medicines").select("image_path").eq("id", id).maybeSingle();
+    const { error } = await supabase.from("medicines").delete().eq("id", id);
+    if (error) throw error;
+    if (medicine?.image_path?.includes(".blob.vercel-storage.com/")) await del(medicine.image_path);
+    revalidatePath("/product"); revalidatePath("/admin/medicines");
     return true;
-  } catch (error) {
-    console.error(`Failed to delete medicine (id: ${id}):`, JSON.stringify(error, null, 2));
-    return false;
-  }
+  } catch (error) { console.error("Failed to delete medicine:", error); return false; }
 };
