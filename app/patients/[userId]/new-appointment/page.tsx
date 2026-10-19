@@ -1,10 +1,15 @@
 import Image from "next/image";
+import { redirect } from "next/navigation";
 
 import { AppointmentForm } from "@/components/forms/AppointmentForm";
 import { getPatient } from "@/lib/actions/patient.actions";
 
 const Appointment = async ({ params: { userId } }: SearchParamProps) => {
   const patient = await getPatient(userId);
+
+  // The appointment action requires an existing patient record. Send users
+  // through registration instead of rendering a form that can never submit.
+  if (!patient) redirect(`/patients/${userId}/register`);
 
   return (
     <div className="flex h-screen max-h-screen">
@@ -19,7 +24,7 @@ const Appointment = async ({ params: { userId } }: SearchParamProps) => {
           />
 
           <AppointmentForm
-            patientId={patient?.$id}
+            patientId={patient.$id}
             userId={userId}
             type="create"
           />

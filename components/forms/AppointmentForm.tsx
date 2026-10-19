@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Dispatch, SetStateAction, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import toast from "react-hot-toast";
 
 import { SelectItem } from "@/components/ui/select";
 import { Doctors } from "@/constants";
@@ -89,6 +90,8 @@ export const AppointmentForm = ({
           router.push(
             `/patients/${userId}/new-appointment/success?appointmentId=${newAppointment.$id}`
           );
+        } else {
+          toast.error("We couldn't save your appointment. Please try again.");
         }
       } else {
         const appointmentToUpdate = {
@@ -111,7 +114,8 @@ export const AppointmentForm = ({
         }
       }
     } catch (error) {
-      console.log(error);
+      console.error("Appointment form submission failed:", error);
+      toast.error("We couldn't save your appointment. Please try again.");
     }
     setIsLoading(false);
   };

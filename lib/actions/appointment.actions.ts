@@ -14,7 +14,7 @@ const fromAppointment = (row: any) => ({
 
 export const createAppointment = async (appointment: CreateAppointmentParams) => {
   try {
-    const { data: patient, error: patientError } = await getSupabaseAdmin().from("patients").select("id").eq("id", appointment.patient).maybeSingle();
+    const { data: patient, error: patientError } = await getSupabaseAdmin().from("patients").select("id").eq("id", appointment.patient).eq("user_id", appointment.userId).maybeSingle();
     if (patientError || !patient) return null;
     const { data, error } = await getSupabaseAdmin().from("appointments").insert({
       user_id: appointment.userId, patient_id: patient.id,
