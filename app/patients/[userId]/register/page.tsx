@@ -1,10 +1,18 @@
 import Image from "next/image";
 
 import {RegisterForm} from "@/components/forms/RegisterForm";
-import { getUser } from "@/lib/actions/patient.actions";
+import { getPatient, getUser } from "@/lib/actions/patient.actions";
+import { redirect } from "next/navigation";
 
 const Register = async ({ params: { userId} }: SearchParamProps) => {
   const user = await getUser(userId);
+  const patient = await getPatient(userId);
+
+  // ✅ Guard against missing user
+  if (!user) redirect("/");
+
+  // ✅ Already registered — skip to appointment
+  if (patient) redirect(`/patients/${userId}/new-appointment`);
 
   return (
     <div className="flex h-screen max-h-screen">
@@ -21,7 +29,7 @@ const Register = async ({ params: { userId} }: SearchParamProps) => {
           <RegisterForm user={user} />
           
 
-          <p className="c">© 2024 CarePluse</p>
+          <p className="copyright">© 2026 CarePluse</p>
         </div>
       </section>
 

@@ -1,92 +1,231 @@
-"use server"
+"use server";
 
-import { Medicine } from '@/types/appwrite.types';
-import type { NextApiRequest, NextApiResponse } from 'next';
-import fetch from 'node-fetch';
-import { API_KEY, DATABASE_ID, databases, MEDICINE_ID, PROJECT_ID } from '../appwrite.config';
-import { parseStringify } from '../utils';
- 
+import { ID, Query } from "node-appwrite";
+import { InputFile } from "node-appwrite/file";
+import {
+  BUCKET_ID,
+  DATABASE_ID,
+  ENDPOINT,
+  MEDICINE_ID,
+  PROJECT_ID,
+  databases,
+  storage,
+} from "../appwrite.config";
+import { parseStringify } from "../utils";
+import { Medicine } from "@/types/appwrite.types";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export type CreateMedicineParams = {
+  medicineName: string;
+  description: string;
+  price: number;
+  category: string;
+  stock: number;
+  unit: string;
+  dosage: string;
+  requiresPrescription: boolean;
+  manufacturer: string;
+  expiryDate: string;
+  imageFile?: FormData; // ✅ matches patient pattern
+};
+
+export type UpdateMedicineParams = Partial<Omit<CreateMedicineParams, "imageFile">> & {
+  imageFile?: FormData;
+};
+
+const getAppwriteFetchError = (error: unknown, subject: string): Error => {
+  const cause = error instanceof Error ? (error as Error & { cause?: { code?: string } }).cause : undefined;
+  if (cause?.code === "UND_ERR_CONNECT_TIMEOUT" || (error instanceof Error && error.message === "fetch failed")) {
+    return new Error(`Could not connect to Appwrite to load ${subject}. Check internet/firewall access to the configured Appwrite endpoint and confirm the endpoint URL is correct.`);
+  }
+  return new Error(`Could not load ${subject} from Appwrite. Check the database, collection, and read permissions, then try again.`);
+};
+
+// ─── LIST MEDICINES ───────────────────────────────────────────────────────────
 export const listMedicines = async (): Promise<Medicine[]> => {
   try {
-    const response = await databases.listDocuments<Medicine>(DATABASE_ID!, MEDICINE_ID!);
-    return response.documents;
+    if (!DATABASE_ID || !MEDICINE_ID) {
+      throw new Error("Appwrite medicine collection is not configured (DATABASE_ID or MEDICINE_ID is missing).");
+    }
+    const response = await databases.listDocuments<Medicine>(
+      DATABASE_ID!,
+      MEDICINE_ID!
+    );
+    const medicines = parseStringify(response.documents) as Medicine[];
+    return medicines.sort((a, b) => a.medicineName.localeCompare(b.medicineName));
   } catch (error) {
-    console.error("An error occurred while retrieving the medicine details:", error);
+    console.error("Failed to list medicines:", error);
+    throw getAppwriteFetchError(error, "medicines");
+  }
+};
+
+// ─── GET MEDICINE BY ID ───────────────────────────────────────────────────────
+export const getMedicineById = async (id: string): Promise<Medicine | null> => {
+  try {
+    const medicine = await databases.getDocument<Medicine>(
+      DATABASE_ID!,
+      MEDICINE_ID!,
+      id
+    );
+    return parseStringify(medicine);
+  } catch (error) {
+    console.error(`Failed to retrieve medicine (id: ${id}):`, error);
+    throw getAppwriteFetchError(error, "this medicine");
+  }
+};
+
+// ─── GET MEDICINES BY CATEGORY ────────────────────────────────────────────────
+export const getMedicinesByCategory = async (category: string): Promise<Medicine[]> => {
+  try {
+    const response = await databases.listDocuments<Medicine>(
+      DATABASE_ID!,
+      MEDICINE_ID!,
+      [Query.equal("category", category), Query.orderAsc("medicineName")]
+    );
+    return parseStringify(response.documents);
+  } catch (error) {
+    console.error(`Failed to get medicines by category "${category}":`, JSON.stringify(error, null, 2));
     return [];
   }
 };
 
-export const getMedicineById = async (id: string) => {
+// ─── SEARCH MEDICINES ─────────────────────────────────────────────────────────
+export const searchMedicines = async (searchTerm: string): Promise<Medicine[]> => {
+  if (!searchTerm || searchTerm.trim().length === 0) return [];
+  if (searchTerm.trim().length > 100) return [];
+
   try {
-    const response = await databases.getDocument(DATABASE_ID!, MEDICINE_ID!, id);
-    return parseStringify (response); // Return the medicine details
+    const response = await databases.listDocuments<Medicine>(
+      DATABASE_ID!,
+      MEDICINE_ID!,
+      [Query.search("medicineName", searchTerm.trim()), Query.orderAsc("medicineName")]
+    );
+    return parseStringify(response.documents);
   } catch (error) {
-    console.error("An error occurred while retrieving the medicine details:", error);
-    return null; // Return null if an error occurs
+    console.error(`Failed to search medicines for "${searchTerm}":`, JSON.stringify(error, null, 2));
+    return [];
   }
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { url } = req.query;
-
-  if (typeof url !== 'string') {
-    return res.status(400).json({ error: 'Invalid URL' });
-  }
-
-  const apiUrl = decodeURIComponent(url);
-
+// ─── CREATE MEDICINE ──────────────────────────────────────────────────────────
+export const createMedicine = async ({
+  imageFile,
+  ...medicineData
+}: CreateMedicineParams): Promise<Medicine | null> => {
   try {
-    const response = await fetch(apiUrl, {
-      headers: {
-        'X-Appwrite-Project': PROJECT_ID!,
-        'X-Appwrite-Key': API_KEY!,
-      },
-    });
+    // ✅ Same pattern as registerPatient
+    let file;
+    if (imageFile) {
+      const blob = imageFile.get("blobFile") as Blob;
+      const fileName = imageFile.get("fileName") as string;
 
-    if (!response.ok) {
-      throw new Error(`Network response was not ok: ${response.statusText}`);
-    }
-
-    const contentType = response.headers.get('content-type');
-    if (!contentType?.includes('image')) {
-      throw new Error('The requested resource is not a valid image');
-    }
-
-    const imageBuffer = await response.arrayBuffer();
-
-    res.setHeader('Content-Type', contentType);
-    res.send(Buffer.from(imageBuffer));
-  } catch (error) {
-    console.error('Error fetching image:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    res.status(500).json({ error: errorMessage });
-  }
-}
-
-export const loadimage = async (imageUrl: string, elementId:string) => {
-  try {
-    if (true) { // You can add your API key check here
-      const response = await fetch(imageUrl, {
-        headers: {
-          'X-Appwrite-Project': process.env.NEXT_PUBLIC_PROJECT_ID!,
-          'X-Appwrite-Key': process.env.NEXT_PUBLIC_API_KEY!,
-        }
-      });
-  
-      if (!response.ok) {
-        throw new Error('Image fetch failed');
+      if (blob && fileName) {
+        const inputFile = InputFile.fromBuffer(blob, fileName);
+        file = await storage.createFile(BUCKET_ID!, ID.unique(), inputFile);
       }
-    
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      if (document) {
-        const imageDiv = document.getElementById(elementId) as HTMLImageElement;
-        if (imageDiv) imageDiv.src = url;
-      } 
-    } else {
-      throw new Error("AppWrite API key must be provided.")
     }
-  } catch (ex) {
-    console.error(ex);
+
+    // ✅ Generate docId and use it as medicineId
+    const docId = ID.unique();
+
+    const medicine = await databases.createDocument<Medicine>(
+      DATABASE_ID!,
+      MEDICINE_ID!,
+      docId,
+      {
+        ...medicineData,
+        medicineId: docId,
+        medicineImageId: file?.$id ?? null,
+        medicineImageUrl: file?.$id
+          ? `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${file.$id}/view?project=${PROJECT_ID}`
+          : null,
+      }
+    );
+
+    return parseStringify(medicine);
+  } catch (error) {
+    console.error("Failed to create medicine:", JSON.stringify(error, null, 2));
+    return null;
+  }
+};
+
+// ─── UPDATE MEDICINE ──────────────────────────────────────────────────────────
+export const updateMedicine = async (
+  id: string,
+  { imageFile, ...updates }: UpdateMedicineParams
+): Promise<Medicine | null> => {
+  try {
+    let file;
+
+    if (imageFile) {
+      // ✅ Same pattern as registerPatient image upload
+      const blob = imageFile.get("blobFile") as Blob;
+      const fileName = imageFile.get("fileName") as string;
+
+      if (blob && fileName) {
+        // Upload new image first
+        const inputFile = InputFile.fromBuffer(blob, fileName);
+        file = await storage.createFile(BUCKET_ID!, ID.unique(), inputFile);
+
+        // Delete old image if it exists
+        const existing = await databases.getDocument<Medicine>(
+          DATABASE_ID!,
+          MEDICINE_ID!,
+          id
+        );
+        if (existing.medicineImageId) {
+          try {
+            await storage.deleteFile(BUCKET_ID!, existing.medicineImageId);
+          } catch {
+            console.error("Failed to delete old medicine image");
+          }
+        }
+      }
+    }
+
+    const updated = await databases.updateDocument<Medicine>(
+      DATABASE_ID!,
+      MEDICINE_ID!,
+      id,
+      {
+        ...updates,
+        ...(file?.$id && {
+          medicineImageId: file.$id,
+          medicineImageUrl: `${ENDPOINT}/storage/buckets/${BUCKET_ID}/files/${file.$id}/view?project=${PROJECT_ID}`,
+        }),
+      }
+    );
+
+    return parseStringify(updated);
+  } catch (error) {
+    console.error(`Failed to update medicine (id: ${id}):`, JSON.stringify(error, null, 2));
+    return null;
+  }
+};
+
+// ─── DELETE MEDICINE ──────────────────────────────────────────────────────────
+export const deleteMedicine = async (id: string): Promise<boolean> => {
+  try {
+    const medicine = await databases.getDocument<Medicine>(
+      DATABASE_ID!,
+      MEDICINE_ID!,
+      id
+    );
+
+    await databases.deleteDocument(DATABASE_ID!, MEDICINE_ID!, id);
+
+    if (medicine.medicineImageId) {
+      try {
+        await storage.deleteFile(BUCKET_ID!, medicine.medicineImageId);
+      } catch {
+        console.error("Failed to delete medicine image from storage");
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error(`Failed to delete medicine (id: ${id}):`, JSON.stringify(error, null, 2));
+    return false;
   }
 };

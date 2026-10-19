@@ -1,3 +1,5 @@
+//lib/appwirte.config
+
 import * as sdk from "node-appwrite";
 
 export const {
@@ -10,6 +12,8 @@ export const {
   APPOINTMENT_COLLECTION_ID,
   NEXT_PUBLIC_BUCKET_ID: BUCKET_ID,
   MEDICINE_ID,
+  APPWRITE_ORDERS_COLLECTION_ID,
+  APPWRITE_ORDER_ITEMS_COLLECTION_ID,
 } = process.env;
 
 const client = new sdk.Client();

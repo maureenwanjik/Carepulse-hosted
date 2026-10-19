@@ -1,60 +1,53 @@
 'use client'
 
 import React from 'react'
-import Image from 'next/image'
+import Link from 'next/link'
 import Products from '@/components/forms/products'
 import { IoIosCart } from 'react-icons/io'
+import { Pill } from 'lucide-react'
 import { useStateContext } from '@/components/context/StateContext'
 import Cart from '@/components/Cart'
+import Navbar from '@/components/Navbar'
 
 const Page: React.FC = () => {
   const { totalQuantities, setShowCart, showCart } = useStateContext()
 
+  const cartButton = (
+    <button
+      type="button"
+      onClick={() => setShowCart(true)}
+      className="relative shad-gray-btn rounded-md px-4 py-2 text-14-medium flex items-center gap-2"
+    >
+      <IoIosCart className="text-lg" />
+      <span>Cart</span>
+      {totalQuantities > 0 && (
+        <span className="absolute -top-2 -right-2 size-5 rounded-full bg-green-500 text-white text-[11px] font-bold flex items-center justify-center">
+          {totalQuantities}
+        </span>
+      )}
+    </button>
+  )
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <Image
-            src="/assets/icons/logo-full.svg"
-            alt="CarePulse Logo"
-            width={150}
-            height={40}
-            className="object-contain"
-          />
-          <button
-            type="button"
-            onClick={() => setShowCart(true)}
-            className="relative text-gray-700 hover:text-gray-900 focus:outline-none"
-          >
-            <IoIosCart className="text-2xl" />
-            {totalQuantities > 0 && (
-              <span className="absolute -top-1 -right-2 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
-                {totalQuantities}
-              </span>
-            )}
-          </button>
-        </div>
-      </header>
+    <div className="min-h-screen bg-dark-200">
+      <Navbar rightContent={cartButton} />
 
-      {/* Main Content */}
-      <main className="flex-grow container mx-auto px-6 py-8">
-        <h1 className="text-3xl font-semibold text-gray-800 mb-6">
-          Medicines In Stock
-        </h1>
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        {/* Title */}
+        <section className="mb-8 space-y-2">
+          <h1 className="header inline-flex items-center gap-2"><Pill aria-hidden="true" size={28} /> Online Pharmacy</h1>
+          <p className="text-dark-700">
+            Browse and order medicines delivered to your door.
+          </p>
+        </section>
 
-          <Products />
-
+        <Products />
       </main>
 
-      {/* Footer */}
-      <footer className="bg-white border-t">
-        <div className="container mx-auto px-6 py-4 text-center text-sm text-gray-500">
-          © {new Date().getFullYear()} CarePulse
-        </div>
+      <footer className="border-t border-dark-500 py-6 text-center">
+        <p className="text-14-regular text-dark-600">© 2026 CarePulse</p>
       </footer>
 
-      {/* Cart Overlay */}
       {showCart && <Cart />}
     </div>
   )

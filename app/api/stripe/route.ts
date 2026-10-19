@@ -1,85 +1,70 @@
 // app/api/stripe/route.ts
+import { NextRequest } from 'next/server'
+import Stripe from 'stripe'
 
-import Stripe from 'stripe';
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' })
 
-const stripe = new Stripe(process.env.NEXT_PUBLIC_STRIPE_SECRET_KEY!, { apiVersion: '2024-06-20' });
-
-interface LineItem {
-  priceqty: number;
-  image: { asset: { _ref: string; } }[];
-  name: string;
-  quantity: number;
+interface CartItem {
+  id: string
+  name: string
+  priceqty: number
+  quantity: number
 }
 
-interface SessionCreateParams {
-  submit_type: 'pay';
-  mode: 'payment';
-  payment_method_types: any;
-  billing_address_collection: 'auto' | 'required';
-  shipping_options: { shipping_rate: string; }[];
-  line_items: {
-    price_data: {
-      currency: string;
-      product_data: {
-        name: string;
-      };
-      unit_amount: number; // Amount in cents
-    };
-    adjustable_quantity: {
-      enabled: boolean;
-      minimum: number;
-    };
-    quantity: number;
-  }[];
-  success_url: string;
-  cancel_url: string;
-}
-
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { cartItems }: { cartItems: LineItem[] } = await request.json(); // Access cartItems from the request body
+    const {
+      cartItems,
+      userId,
+      patientId,
+      deliveryAddress,
+    }: {
+      cartItems: CartItem[]
+      userId: string
+      patientId: string
+      deliveryAddress: string
+    } = await request.json()
 
-    const params: SessionCreateParams = {
+    const origin = request.headers.get('origin') || 'http://localhost:3000'
+
+    const session = await stripe.checkout.sessions.create({
       submit_type: 'pay',
       mode: 'payment',
       payment_method_types: ['card'],
       billing_address_collection: 'auto',
-      shipping_options: [
-        { shipping_rate: 'shr_1RDjPiBxmjt1TEptvDEZ0mBR' }, // Ensure this shipping rate ID is correct
-      ],
       line_items: cartItems.map((item) => ({
         price_data: {
-          currency: 'kes', // Use your currency code
-          product_data: {
-            name: item.name,
-          },
-          unit_amount: item.priceqty * 100, // Convert price to cents
+          currency: 'kes',
+          product_data: { name: item.name },
+          unit_amount: item.priceqty * 100,
         },
-        adjustable_quantity: {
-          enabled: true,
-          minimum: 1,
-        },
+        adjustable_quantity: { enabled: true, minimum: 1 },
         quantity: item.quantity,
       })),
-      success_url: `${request.url}/success`, // Adjust success URL
-      cancel_url: `${request.url}?canceled=true`, // Adjust cancel URL
-    };
+      metadata: {
+        userId,
+        patientId,
+        deliveryAddress,
+        paymentMethod: 'card',
+        cartItems: JSON.stringify(
+          cartItems.map((item) => ({
+            medicineId: item.id,
+            medicineName: item.name,
+            quantity: item.quantity,
+            unitPrice: item.priceqty,
+          }))
+        ),
+        totalAmount: cartItems
+          .reduce((sum, item) => sum + item.priceqty * item.quantity, 0)
+          .toString(),
+      },
+      success_url: `${origin}/product/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/product?canceled=true`,
+    })
 
-    // Create Checkout Sessions from body params.
-    const session = await stripe.checkout.sessions.create(params);
-    return new Response(JSON.stringify({ id: session.id }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    return Response.json({ id: session.id })
   } catch (error) {
-    console.error('Error creating checkout session:', error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    console.error('Stripe error:', error)
+    return Response.json({ error: (error as Error).message }, { status: 500 })
   }
 }

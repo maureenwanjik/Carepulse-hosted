@@ -9,6 +9,14 @@ export const UserFormValidation = z.object({
   phone: z
     .string()
     .refine((phone) => /^\+\d{10,15}$/.test(phone), "Invalid phone number"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .max(50, "Password must be at most 50 characters"),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
 });
 
 export const PatientFormValidation = z.object({
@@ -116,3 +124,21 @@ export function getAppointmentSchema(type: string) {
       return ScheduleAppointmentSchema;
   }
 }
+
+export const LoginFormValidation = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const ResetPasswordValidation = z.object({
+  otp: z.string().length(6, "OTP must be 6 digits"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(50),
+  confirmPassword: z.string(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"],
+});
+
+export const ForgotPasswordValidation = z.object({
+  email: z.string().email("Invalid email address"),
+});

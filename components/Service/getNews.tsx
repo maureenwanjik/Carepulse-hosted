@@ -2,7 +2,7 @@ import axios from "axios"
 
 export function getNews(category ='Health', country='us') {
     const API_Key =  process.env.NEXT_PUBLIC_API_KEY2!
-    const API_Endpoint = `https://newsapi.org/v2/top-headlines?country=${country}&category=${category}`
+    const API_Endpoint = `https://newsapi.org/v2/everything?q=${category}&language=en&sortBy=publishedAt`
 
    return axios.get(`${API_Endpoint}&apiKey=${API_Key}`)
 

@@ -1,145 +1,196 @@
-'use client';
-import { getNews } from '@/components/Service/getNews';
-import React, { useEffect, useState } from 'react';
-import moment from 'moment';
-import Image from 'next/image';
+'use client'
+
+import { getNews } from '@/components/Service/getNews'
+import React, { useEffect, useState } from 'react'
+import moment from 'moment'
+import Navbar from '@/components/Navbar'
 
 interface NewsArticle {
-  urlToImage: string;
-  title: string;
-  content: string;
-  author: string | null;
-  publishedAt: string;
-  url: string;
+  urlToImage: string
+  title: string
+  content: string
+  author: string | null
+  publishedAt: string
+  url: string
 }
 
-const Page: React.FC = () => {
-  const [newsData, setNewsData] = useState<NewsArticle[]>([]);
-  const [selectOption, setSelectOption] = useState('health');
-  const [selectCountry, setSelectCountry] = useState('us');
+const CATEGORIES = ['general', 'health', 'business', 'sports', 'technology']
+const COUNTRIES = [
+  { value: 'us', label: 'United States' },
+  { value: 'gb', label: 'United Kingdom' },
+  { value: 'au', label: 'Australia' },
+  { value: 'de', label: 'Germany' },
+  { value: 'it', label: 'Italy' },
+]
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+const SkeletonCard = () => (
+  <div className="rounded-xl border border-dark-500 bg-dark-400 overflow-hidden animate-pulse">
+    <div className="h-48 bg-dark-300" />
+    <div className="p-4 space-y-3">
+      <div className="h-4 bg-dark-300 rounded w-3/4" />
+      <div className="h-4 bg-dark-300 rounded w-full" />
+      <div className="h-4 bg-dark-300 rounded w-2/3" />
+      <div className="flex justify-between mt-4">
+        <div className="h-3 bg-dark-300 rounded w-1/4" />
+        <div className="h-3 bg-dark-300 rounded w-1/4" />
+      </div>
+    </div>
+  </div>
+)
+
+// ─── News Card ────────────────────────────────────────────────────────────────
+const NewsCard = ({ news }: { news: NewsArticle }) => (
+  <a
+    href={news.url}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="group flex flex-col rounded-xl border border-dark-500 bg-dark-400 overflow-hidden hover:border-green-500 transition-colors"
+  >
+    <div className="relative h-48 bg-dark-300 flex-shrink-0">
+      {news.urlToImage ? (
+        <img
+          src={news.urlToImage}
+          alt={news.title}
+          className="w-full h-full object-cover"
+          onError={(e) => { e.currentTarget.style.display = 'none' }}
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <span className="text-4xl">📰</span>
+        </div>
+      )}
+    </div>
+
+    <div className="flex flex-col flex-1 p-4 space-y-3">
+      <h3 className="text-14-medium text-white line-clamp-2 group-hover:text-green-500 transition-colors">
+        {news.title}
+      </h3>
+      <p className="text-12-regular text-dark-700 line-clamp-3 flex-1">
+        {news.content ? news.content.slice(0, 120) + '...' : 'No content available.'}
+      </p>
+      <div className="border-t border-dark-500 pt-3 flex items-center justify-between">
+        <span className="text-12-regular text-dark-600 truncate max-w-[55%]">
+          {news.author ?? 'Unknown'}
+        </span>
+        <span className="text-12-regular text-dark-600">
+          {moment(news.publishedAt).format('MMM D, YYYY')}
+        </span>
+      </div>
+      <span className="text-12-semibold text-green-500 group-hover:underline">
+        Read more →
+      </span>
+    </div>
+  </a>
+)
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+const NewsPage: React.FC = () => {
+  const [newsData, setNewsData] = useState<NewsArticle[]>([])
+  const [selectOption, setSelectOption] = useState('health')
+  const [selectCountry, setSelectCountry] = useState('us')
+  const [loading, setLoading] = useState(false)
 
   const getAllNews = async () => {
+    setLoading(true)
     try {
-      const data = await getNews(selectOption, selectCountry);
-      console.log("API Response:", data);
-      if (data && data.data && data.data.articles) {
-        setNewsData(data.data.articles);
+      const data = await getNews(selectOption, selectCountry)
+      if (data?.data?.articles) {
+        setNewsData(data.data.articles)
       } else {
-        console.error('No articles found in the response');
+        setNewsData([])
       }
     } catch (error) {
-      console.error("Error fetching news:", error);
+      console.error('Error fetching news:', error)
+      setNewsData([])
+    } finally {
+      setLoading(false)
     }
-  };
-  
-  const selectCategory = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectOption(event.target.value);
-  };
-
-  const selectCountryHandler = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectCountry(event.target.value);
-  };
+  }
 
   useEffect(() => {
-    getAllNews();
-  }, [selectOption, selectCountry]);
+    getAllNews()
+  }, [selectOption, selectCountry])
 
   return (
-    <div className="min-h-screen bg-gray-900 py-8">
-      {/* Header */}
-      <header className="mb-10 text-center">
-        <h1 className="text-4xl font-extrabold text-white drop-shadow-lg">
-          Latest News
-        </h1>
-        <p className="mt-2 text-lg text-gray-300">
-          Stay updated with the latest headlines from around the world
-        </p>
-      </header>
+    <div className="min-h-screen bg-dark-200">
+      <Navbar />
 
-      {/* Selectors */}
-      <div className="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center mb-10 space-y-4 md:space-y-0 md:space-x-8 px-4">
-        <div className="flex items-center">
-          <label htmlFor="category" className="text-white mr-3 font-medium">
-            Category:
-          </label>
-          <select
-            id="category"
-            name="category"
-            value={selectOption}
-            onChange={selectCategory}
-            className="px-4 py-2 bg-gray-800 text-gray-100 border border-gray-700 rounded outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="general">General</option>
-            <option value="health">Health</option>
-            <option value="business">Business</option>
-            <option value="sports">Sports</option>
-            <option value="technology">Technology</option>
-          </select>
-        </div>
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        {/* Title */}
+        <section className="mb-8 space-y-2">
+          <h1 className="header">Health News 📰</h1>
+          <p className="text-dark-700">
+            Stay updated with the latest health and medical headlines.
+          </p>
+        </section>
 
-        <div className="flex items-center">
-          <label htmlFor="country" className="text-white mr-3 font-medium">
-            Country:
-          </label>
-          <select
-            id="country"
-            name="country"
-            value={selectCountry}
-            onChange={selectCountryHandler}
-            className="px-4 py-2 bg-gray-800 text-gray-100 border border-gray-700 rounded outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="us">United States</option>
-            <option value="au">Australia</option>
-            <option value="it">Italy</option>
-            <option value="gb">United Kingdom</option>
-            <option value="de">Germany</option>
-          </select>
-        </div>
-      </div>
-
-      {/* News Cards Grid */}
-      <main className="max-w-7xl mx-auto px-4">
-        {newsData.length === 0 ? (
-          <p className="text-center text-gray-300">No news articles available.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {newsData.map((news, index) => (
-              <div
-                key={index}
-                className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-lg transition-transform transform hover:scale-105"
+        {/* Filters */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center mb-8">
+          {/* Category pills */}
+          <div className="flex gap-2 overflow-x-auto remove-scrollbar pb-1 flex-1">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectOption(cat)}
+                className={`whitespace-nowrap rounded-full px-4 py-1.5 text-14-medium capitalize transition-colors ${
+                  selectOption === cat
+                    ? 'bg-green-500 text-white'
+                    : 'border border-dark-500 bg-dark-400 text-dark-700 hover:text-white'
+                }`}
               >
-                <a
-                  href={news.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex flex-col h-full"
-                >
-                  {/* News image */}
+                {cat}
+              </button>
+            ))}
+          </div>
 
-                  {/* Article Content */}
-                  <div className="p-4 flex flex-col flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">
-                      {news.title}
-                    </h3>
-                    <p className="text-gray-700 dark:text-gray-300 flex-1">
-                      {news.content ? news.content.slice(0, 100) + '...' : 'No content available.'}
-                    </p>
-                    <div className="mt-4 flex justify-between items-center text-sm text-gray-500 dark:text-gray-400">
-                      <span>By: {news.author ? news.author : 'Unknown'}</span>
-                      <span>{moment(news.publishedAt).format('L')}</span>
-                    </div>
-                    <div className="mt-3 text-blue-600 dark:text-blue-400 font-semibold hover:underline">
-                      Read more →
-                    </div>
-                  </div>
-                </a>
-              </div>
+          {/* Country selector */}
+          <select
+            value={selectCountry}
+            onChange={(e) => setSelectCountry(e.target.value)}
+            className="rounded-md border border-dark-500 bg-dark-400 px-3 py-2 text-14-regular text-white outline-none flex-shrink-0"
+          >
+            {COUNTRIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Results count */}
+        {!loading && (
+          <p className="text-14-regular text-dark-700 mb-4">
+            {newsData.length} article{newsData.length !== 1 ? 's' : ''} found
+          </p>
+        )}
+
+        {/* Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
+          </div>
+        ) : newsData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 space-y-3">
+            <span className="text-5xl">📭</span>
+            <p className="text-dark-700 text-16-regular">
+              No articles found. Try a different category.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {newsData.map((news, index) => (
+              <NewsCard key={index} news={news} />
             ))}
           </div>
         )}
       </main>
-    </div>
-  );
-};
 
-export default Page;
+      <footer className="border-t border-dark-500 py-6 text-center">
+        <p className="text-14-regular text-dark-600">© 2026 CarePulse</p>
+      </footer>
+    </div>
+  )
+}
+
+export default NewsPage

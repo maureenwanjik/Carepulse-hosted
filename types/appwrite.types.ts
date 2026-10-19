@@ -1,3 +1,5 @@
+//types/appwrite.types
+
 import { Models } from "node-appwrite";
 
 export interface Patient extends Models.Document {
@@ -36,11 +38,37 @@ export interface Appointment extends Models.Document {
 }
 
 export interface Medicine extends Models.Document {
-  medicineId:string;
-  medicineName: string; 
-  image:string;
-  Description:string;
-  Price:string;
-  priceqty:number
-  
+  medicineId: string;
+  medicineName: string;
+  medicineImageId: string;
+  medicineImageUrl: string;
+  description: string;
+  price: number;           // use number not string for calculations
+  category: string;        // e.g. "Antibiotics", "Pain Relief", "Vitamins"
+  stock: number;           // how many units available
+  unit: string;            // e.g. "tablet", "bottle", "capsule"
+  dosage: string;          // e.g. "500mg", "10ml"
+  requiresPrescription: boolean;
+  manufacturer: string;
+  expiryDate: string;
+}
+
+export interface Order extends Models.Document {
+  userId: string;
+  patientId: string;
+  status: "pending" | "confirmed" | "delivered" | "cancelled";
+  totalAmount: number;
+  deliveryAddress: string;
+  paymentMethod: string;
+  paymentStatus: "unpaid" | "paid";
+  notes?: string;
+}
+
+export interface OrderItem extends Models.Document {
+  orderId: string;
+  medicineId: string;
+  medicineName: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
 }

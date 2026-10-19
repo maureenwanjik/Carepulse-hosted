@@ -73,7 +73,13 @@ const RequestSuccess = async ({
           </Link>
         </Button>
 
-        <p className="copyright">© 2024 CarePluse</p>
+          <Button variant="outline" className="shad-gray-btn" asChild>
+    <Link href="/dashboard">
+      Go to Dashboard
+    </Link>
+  </Button>
+
+        <p className="copyright">© 2026 CarePluse</p>
       </div>
     </div>
   );

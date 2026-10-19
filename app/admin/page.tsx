@@ -7,6 +7,8 @@ import {DataTable} from '@/components/table/DataTabel'
 import DashboardContent from '@/components/DashboardContent';
 import { getRecentAppointmentList } from "@/lib/actions/appointment.actions";
 
+export const dynamic = "force-dynamic";
+
 const AdminPage = async () => {
   const appointments = await getRecentAppointmentList();
 

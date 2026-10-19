@@ -7,12 +7,8 @@ import Link from 'next/link';
 import StatCard from '@/components/StatCard';
 import { columns } from '@/components/table/columns';
 import { DataTable } from '@/components/table/DataTabel';
-
-interface Appointment {
-  id: string;
-  status: string;
-  // ... additional appointment properties
-}
+import { Package, Pill } from 'lucide-react';
+import { Appointment } from '@/types/appwrite.types';
 
 interface AppointmentsData {
   scheduledCount: number;
@@ -48,7 +44,21 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ appointments }) => 
             className="h-8 w-fit"
           />
         </Link>
+        <div className="flex items-center gap-4">
+        <Link
+          href="/admin/medicines"
+          className="shad-gray-btn rounded-md px-4 py-2 text-14-medium flex items-center gap-2"
+        >
+          <Pill aria-hidden="true" size={16} /> Medicines
+        </Link>
+        <Link
+          href="/admin/orders"
+          className="shad-gray-btn rounded-md px-4 py-2 text-14-medium flex items-center gap-2"
+        >
+          <Package aria-hidden="true" size={16} /> Orders
+        </Link>
         <p className="text-16-semibold">Admin Dashboard</p>
+      </div>
       </header>
 
       <main className="admin-main">
