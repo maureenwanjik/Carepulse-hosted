@@ -7,10 +7,10 @@ export default function Home({searchParams}: SearchParamProps) {
   const isAdmin = searchParams.admin === 'true'
 
   return (
-    <div className="flex h-screen max-h-screen">
+    <div className="flex min-h-dvh w-full flex-col lg:h-dvh lg:flex-row lg:overflow-hidden">
       {isAdmin && <PasskeyModal />}
 
-      <section className="remove-scrollbar container my-auto">
+      <section className="order-2 my-auto min-h-0 w-full flex-1 overflow-y-auto px-[5%] lg:order-1 lg:w-1/2">
         <div className="sub-container max-w-[496px]  max-h-[600px]">
           <Image
             src="/assets/icons/logo-full.svg"
@@ -38,13 +38,13 @@ export default function Home({searchParams}: SearchParamProps) {
           </div>
         </div>
       </section>
-{/*try and put a video using gsap */}
-      <Image 
+
+      <Image
         src="/assets/images/onboarding-img.png"
         height={1000}
         width={1000}
         alt="patient"
-        className="side-img max-w-[50%]"
+        className="order-1 block h-[26vh] min-h-[160px] max-h-[280px] w-full object-cover object-center sm:h-[32vh] lg:order-2 lg:h-dvh lg:min-h-0 lg:max-h-none lg:w-1/2 lg:max-w-none"
       />
     </div>
   );
