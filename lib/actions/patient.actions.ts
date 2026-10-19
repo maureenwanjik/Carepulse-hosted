@@ -22,16 +22,34 @@ export const createUser = async (user: CreateUserParams & { password: string }) 
     const { data, error } = await getSupabasePublic().auth.signUp({
       email: user.email,
       password: user.password,
-      options: { data: { name: user.name, phone: user.phone } },
+      options: {
+        data: { name: user.name, phone: user.phone },
+        emailRedirectTo: "https://carepulse-hosted.vercel.app/",
+      },
     });
     if (error) return { error: error.message };
     if (!data.user) return { error: "Account could not be created. Please try again." };
     if (data.session) setSessionCookies(data.user.id, data.session.access_token, data.session.refresh_token);
-    else cookies().set("userId", data.user.id, { httpOnly: true, path: "/", sameSite: "lax", maxAge: 60 * 60 * 24 });
+    else return { confirmationRequired: true as const, email: user.email };
     return toUser(data.user);
   } catch (error) {
     console.error("Account creation failed:", error);
     return { error: error instanceof Error ? error.message : "Account creation failed." };
+  }
+};
+
+export const resendSignupConfirmation = async (email: string) => {
+  try {
+    const { error } = await getSupabasePublic().auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: "https://carepulse-hosted.vercel.app/" },
+    });
+    if (error) return { error: error.message };
+    return { success: true };
+  } catch (error) {
+    console.error("Confirmation email resend failed:", error);
+    return { error: "Could not resend the confirmation email. Please try again." };
   }
 };
 

@@ -19,6 +19,7 @@ import {
   loginUser,
   sendPasswordResetOTP,
   resetPassword,
+  resendSignupConfirmation,
 } from "@/lib/actions/patient.actions";
 
 type AuthMode = "signup" | "login" | "forgot" | "reset";
@@ -70,6 +71,9 @@ const SignUpForm = ({ onSwitch }: { onSwitch: (mode: AuthMode) => void }) => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [confirmationEmail, setConfirmationEmail] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const form = useForm<z.infer<typeof UserFormValidation>>({
     resolver: zodResolver(UserFormValidation),
@@ -86,7 +90,8 @@ const SignUpForm = ({ onSwitch }: { onSwitch: (mode: AuthMode) => void }) => {
         phone: values.phone,
         password: values.password,
       });
-      if (newUser && "error" in newUser) setError(newUser.error);
+      if (newUser && "error" in newUser) setError(newUser.error || "Could not create account. Please try again.");
+      else if (newUser && "confirmationRequired" in newUser) setConfirmationEmail(newUser.email || values.email);
       else if (newUser) router.push(`/patients/${newUser.$id}/register`);
       else setError("Could not create account. Please try again.");
     } catch {
@@ -94,6 +99,31 @@ const SignUpForm = ({ onSwitch }: { onSwitch: (mode: AuthMode) => void }) => {
     }
     setIsLoading(false);
   };
+
+  if (confirmationEmail) {
+    return (
+      <div className="space-y-5 rounded-lg border border-dark-500 bg-dark-400 p-5">
+        <h2 className="text-18-semibold text-white">Confirm your email</h2>
+        <p className="text-14-regular text-dark-700">
+          We sent a confirmation link to <span className="text-white">{confirmationEmail}</span>. Open that link, then return here and sign in before booking an appointment.
+        </p>
+        {resendMessage && <p role="status" className="text-14-regular text-green-400">{resendMessage}</p>}
+        {error && <p role="alert" className="text-14-regular text-red-400">{error}</p>}
+        <button type="button" disabled={resending} onClick={async () => {
+          setResending(true); setError(""); setResendMessage("");
+          const result = await resendSignupConfirmation(confirmationEmail);
+          if ("error" in result) setError(result.error || "Could not resend the confirmation email. Please try again.");
+          else setResendMessage("A new confirmation link has been sent. Check your inbox and spam folder.");
+          setResending(false);
+        }} className="shad-primary-btn w-full rounded-md py-3 text-14-medium disabled:opacity-60">
+          {resending ? "Sending…" : "Resend confirmation email"}
+        </button>
+        <p className="text-center text-14-regular text-dark-600">
+          Already confirmed? <button type="button" onClick={() => onSwitch("login")} className="text-green-500 hover:underline">Sign in</button>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <Form {...form}>
@@ -152,6 +182,9 @@ const LoginForm = ({ onSwitch }: { onSwitch: (mode: AuthMode) => void }) => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState("");
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const form = useForm<z.infer<typeof LoginFormValidation>>({
     resolver: zodResolver(LoginFormValidation),
@@ -165,6 +198,7 @@ const LoginForm = ({ onSwitch }: { onSwitch: (mode: AuthMode) => void }) => {
       const result = await loginUser(values.email, values.password);
       if (result && "error" in result) {
         setError(result.error);
+        if (result.error.toLowerCase().includes("email not confirmed")) setUnconfirmedEmail(values.email);
       } else if (result) {
         router.push("/dashboard");
       } else {
@@ -199,6 +233,21 @@ const LoginForm = ({ onSwitch }: { onSwitch: (mode: AuthMode) => void }) => {
           </button>
         </div>
         {error && <p className="text-red-400 text-12-regular">{error}</p>}
+        {unconfirmedEmail && (
+          <div className="space-y-2 rounded-md border border-dark-500 bg-dark-300 p-3">
+            <p className="text-12-regular text-dark-700">Confirm your email using the link we sent before signing in. Check your spam folder too.</p>
+            {resendMessage && <p role="status" className="text-12-regular text-green-400">{resendMessage}</p>}
+            <button type="button" disabled={resending} onClick={async () => {
+              setResending(true); setError(""); setResendMessage("");
+              const result = await resendSignupConfirmation(unconfirmedEmail);
+              if ("error" in result) setError(result.error || "Could not resend the confirmation email. Please try again.");
+              else setResendMessage("A new confirmation link has been sent. Check your inbox and spam folder.");
+              setResending(false);
+            }} className="text-14-medium text-green-500 hover:underline disabled:opacity-60">
+              {resending ? "Sending…" : "Resend confirmation email"}
+            </button>
+          </div>
+        )}
         <SubmitButton isLoading={isLoading}>Login</SubmitButton>
         <p className="text-center text-14-regular text-dark-600">
           Don&apos;t have an account?{" "}
