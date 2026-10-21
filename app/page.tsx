@@ -1,4 +1,5 @@
 import {PatientForm} from "@/components/forms/PatientForm";
+import BrandLogo from "@/components/BrandLogo";
 import PasskeyModal from "@/components/PasskeyModal";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,13 +13,7 @@ export default function Home({searchParams}: SearchParamProps) {
 
       <section className="order-2 my-auto min-h-0 w-full flex-1 overflow-y-auto px-[5%] lg:order-1 lg:w-1/2">
         <div className="sub-container max-w-[496px]  max-h-[600px]">
-          <Image
-            src="/assets/icons/logo-full.svg"
-            height={1000}
-            width={1000}
-            alt="patient"
-            className="mb-12 h-10 w-fit"
-          />
+          <BrandLogo alt="patient" className="mb-12 h-10 w-fit" />
 
           <PatientForm />
 

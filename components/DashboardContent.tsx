@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import BrandLogo from "@/components/BrandLogo";
 import Image from 'next/image';
 import Link from 'next/link';
 import StatCard from '@/components/StatCard';
@@ -36,13 +37,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ appointments }) => 
     <div className="mx-auto flex max-w-7xl flex-col space-y-14">
       <header className="admin-header flex items-center justify-between py-4">
         <Link href="/" className="cursor-pointer">
-          <Image
-            src="/assets/icons/logo-full.svg"
-            height={32}
-            width={162}
-            alt="logo"
-            className="h-8 w-fit"
-          />
+          <BrandLogo alt="logo" className="h-8 w-fit" />
         </Link>
         <div className="flex items-center gap-4">
         <Link

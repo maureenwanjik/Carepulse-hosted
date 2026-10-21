@@ -1,5 +1,6 @@
 // app/dashboard/page.tsx
 import { cookies } from "next/headers";
+import BrandLogo from "@/components/BrandLogo";
 import { redirect } from "next/navigation";
 import { getUser, getPatient } from "@/lib/actions/patient.actions";
 import { getPatientAppointments } from "@/lib/actions/appointment.actions";
@@ -41,13 +42,7 @@ const DashboardPage = async () => {
         <div className="sub-container max-w-[860px]">
           {/* Header */}
           <div className="flex items-center justify-between mb-10">
-            <Image
-              src="/assets/icons/logo-full.svg"
-              height={1000}
-              width={1000}
-              alt="carepulse"
-              className="h-10 w-fit"
-            />
+            <BrandLogo alt="carepulse" className="h-10 w-fit" />
             <div className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle />
               <Link

@@ -1,6 +1,6 @@
 'use client'
 
-import Image from 'next/image'
+import BrandLogo from "@/components/BrandLogo";
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Newspaper, Pill } from 'lucide-react'
@@ -40,13 +40,7 @@ const Navbar = ({ rightContent }: NavbarProps) => {
       <div className="mx-auto flex max-w-7xl items-center justify-between">
         {/* Logo */}
         <Link href="/">
-          <Image
-            src="/assets/icons/logo-full.svg"
-            height={1000}
-            width={1000}
-            alt="carepulse"
-            className="h-9 w-fit"
-          />
+          <BrandLogo alt="carepulse" className="h-9 w-fit" />
         </Link>
 
         {/* Nav links */}

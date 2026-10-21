@@ -1,5 +1,6 @@
 // app/admin/medicines/page.tsx
 import { listMedicines } from "@/lib/actions/medicine.actions";
+import BrandLogo from "@/components/BrandLogo";
 import MedicineList from "@/components/medicines/MedicineList";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,13 +14,7 @@ export default async function MedicinesPage() {
       {/* Header */}
       <header className="admin-header">
         <Link href="/" className="cursor-pointer">
-          <Image
-            src="/assets/icons/logo-full.svg"
-            height={32}
-            width={162}
-            alt="logo"
-            className="h-8 w-fit"
-          />
+          <BrandLogo alt="logo" className="h-8 w-fit" />
         </Link>
         <p className="text-16-semibold">Medicine Management</p>
       </header>

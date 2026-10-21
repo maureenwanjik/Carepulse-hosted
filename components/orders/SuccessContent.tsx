@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import BrandLogo from "@/components/BrandLogo";
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -61,13 +62,7 @@ const SuccessContent = () => {
     <div className="min-h-screen bg-dark-200 flex flex-col items-center justify-center px-6">
       <div className="w-full max-w-md rounded-2xl border border-dark-500 bg-dark-400 p-8 text-center space-y-6">
         {/* Logo */}
-        <Image
-          src="/assets/icons/logo-full.svg"
-          height={1000}
-          width={1000}
-          alt="carepulse"
-          className="h-8 w-fit mx-auto"
-        />
+        <BrandLogo alt="carepulse" className="h-8 w-fit mx-auto" />
 
         {/* Loading */}
         {status === 'loading' && (

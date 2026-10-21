@@ -1,6 +1,7 @@
 //app/admin/orders/page.tsx
 
 import Image from "next/image";
+import BrandLogo from "@/components/BrandLogo";
 import Link from "next/link";
 import { getAllOrders } from "@/lib/actions/order.actions";
 import AdminOrdersClient from "@/components/orders/AdminOrdersClient";
@@ -13,13 +14,7 @@ const AdminOrdersPage = async () => {
       {/* Header */}
       <header className="admin-header">
         <Link href="/">
-          <Image
-            src="/assets/icons/logo-full.svg"
-            height={32}
-            width={162}
-            alt="logo"
-            className="h-8 w-fit"
-          />
+          <BrandLogo alt="logo" className="h-8 w-fit" />
         </Link>
         <div className="flex items-center gap-4">
           <Link

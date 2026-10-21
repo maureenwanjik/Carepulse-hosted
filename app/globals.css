@@ -37,6 +37,8 @@ html, body { min-height: 100%; }
 .light .bg-red-600.text-white,
 .light .bg-red-700.text-white,
 .light .bg-yellow-600.text-white { color: #fff !important; }
+.dark .brand-logo-light,
+.light .brand-logo-dark { display: none !important; }
 
 /* ========================================== TAILWIND STYLES */
 @layer base {
