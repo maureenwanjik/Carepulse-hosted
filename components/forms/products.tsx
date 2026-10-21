@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { Medicine } from '@/types/appwrite.types'
 import { listMedicinesForStore } from '@/lib/actions/medicine.actions'
 import Link from 'next/link'
@@ -129,10 +130,35 @@ const MedicinePage: React.FC = () => {
           <p className="text-16-regular text-dark-700">Medicine products are unavailable right now.</p>
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 space-y-3">
-          <PackageSearch aria-hidden="true" size={40} strokeWidth={1.5} className="text-dark-600" />
-          <p className="text-dark-700 text-16-regular">No medicines found.</p>
-        </div>
+        medicines.length === 0 ? (
+          <section className="space-y-5 py-8" aria-labelledby="medicine-photo-previews">
+            <div className="space-y-2 text-center">
+              <PackageSearch aria-hidden="true" size={40} strokeWidth={1.5} className="mx-auto text-dark-600" />
+              <h2 id="medicine-photo-previews" className="text-16-semibold text-white">No medicines in the catalogue yet</h2>
+              <p className="text-14-regular text-dark-700">
+                These medicine photos are ready to use when inventory is added. They are photo previews, not available products.
+              </p>
+            </div>
+            <div className="mx-auto grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
+              {[
+                { name: 'Aminopenicillin', src: '/assets/images/medicine-aminopenicillin.webp' },
+                { name: 'Paracetamol', src: '/assets/images/medicine-paracetamol.webp' },
+              ].map((photo) => (
+                <figure key={photo.name} className="overflow-hidden rounded-xl border border-dark-500 bg-dark-400">
+                  <div className="relative aspect-[4/3] bg-dark-300">
+                    <Image src={photo.src} alt={`${photo.name} medicine product photo`} fill sizes="(max-width: 640px) 100vw, 50vw" className="object-cover" />
+                  </div>
+                  <figcaption className="p-3 text-14-medium text-white">{photo.name}</figcaption>
+                </figure>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 space-y-3">
+            <PackageSearch aria-hidden="true" size={40} strokeWidth={1.5} className="text-dark-600" />
+            <p className="text-dark-700 text-16-regular">No medicines found.</p>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((med) => (
