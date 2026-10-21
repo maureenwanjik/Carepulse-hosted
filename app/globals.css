@@ -6,6 +6,38 @@
 @tailwind components;
 @tailwind utilities;
 
+:root,
+.dark {
+  color-scheme: dark;
+  --color-dark-200: 13 15 16;
+  --color-dark-300: 19 22 25;
+  --color-dark-400: 26 29 33;
+  --color-dark-500: 54 58 61;
+  --color-dark-600: 118 130 141;
+  --color-dark-700: 171 184 196;
+  --color-light-200: 232 233 233;
+}
+
+.light {
+  color-scheme: light;
+  --color-dark-200: 255 255 255;
+  --color-dark-300: 245 247 248;
+  --color-dark-400: 255 255 255;
+  --color-dark-500: 216 223 228;
+  --color-dark-600: 101 116 128;
+  --color-dark-700: 36 53 65;
+  --color-light-200: 47 59 69;
+}
+
+html, body { min-height: 100%; }
+.light body { background-color: rgb(var(--color-dark-300)); color: rgb(var(--color-dark-700)); }
+.light .text-white { color: rgb(var(--color-dark-700)); }
+.light .bg-green-500.text-white,
+.light .bg-green-600.text-white,
+.light .bg-red-600.text-white,
+.light .bg-red-700.text-white,
+.light .bg-yellow-600.text-white { color: #fff !important; }
+
 /* ========================================== TAILWIND STYLES */
 @layer base {
   /* Remove scrollbar */
@@ -294,29 +326,29 @@
 .react-datepicker__day-name,
 .react-datepicker__day,
 .react-datepicker-time__header {
-  background-color: #1a1d21 !important;
-  border-color: #363a3d !important;
-  color: #abb8c4 !important;
+  background-color: rgb(var(--color-dark-400)) !important;
+  border-color: rgb(var(--color-dark-500)) !important;
+  color: rgb(var(--color-dark-700)) !important;
 }
 
 .react-datepicker__current-month,
 .react-datepicker__day-name,
 .react-datepicker-time__header {
-  color: #ffffff !important;
+  color: rgb(var(--color-dark-700)) !important;
 }
 
 .react-datepicker__triangle {
-  fill: #1a1d21 !important;
-  color: #1a1d21 !important;
-  stroke: #1a1d21 !important;
+  fill: rgb(var(--color-dark-400)) !important;
+  color: rgb(var(--color-dark-400)) !important;
+  stroke: rgb(var(--color-dark-400)) !important;
 }
 
 .react-datepicker__time-list-item:hover {
-  background-color: #363a3d !important;
+  background-color: rgb(var(--color-dark-500)) !important;
 }
 
 .react-datepicker__input-container input {
-  background-color: #1a1d21 !important;
+  background-color: rgb(var(--color-dark-400)) !important;
   width: 100%;
   outline: none;
 }
@@ -332,7 +364,7 @@
 }
 
 .react-datepicker__time-container {
-  border-left: 1px solid #363a3d !important;
+  border-left: 1px solid rgb(var(--color-dark-500)) !important;
 }
 
 .react-datepicker__time-list-item {
@@ -344,11 +376,11 @@
 .PhoneInputInput {
   outline: none;
   margin-left: 4px;
-  background: #1a1d21;
+  background: rgb(var(--color-dark-400));
   font-size: 14px;
   font-weight: 500;
 }
 
 .PhoneInputInput::placeholder {
-  color: #1a1d21;
+  color: rgb(var(--color-dark-600));
 }

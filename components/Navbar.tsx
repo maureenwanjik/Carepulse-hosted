@@ -4,6 +4,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Newspaper, Pill } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import ThemeToggle from '@/components/ThemeToggle'
+import LogoutButton from '@/components/LogoutButton'
 
 interface NavbarProps {
   rightContent?: React.ReactNode
@@ -11,6 +14,20 @@ interface NavbarProps {
 
 const Navbar = ({ rightContent }: NavbarProps) => {
   const pathname = usePathname()
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/user-context', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((context: { userId?: string }) => {
+        if (active) setIsAuthenticated(Boolean(context.userId))
+      })
+      .catch(() => {
+        if (active) setIsAuthenticated(false)
+      })
+    return () => { active = false }
+  }, [pathname])
 
   const links = [
     { href: '/dashboard', label: 'Dashboard' },
@@ -51,7 +68,11 @@ const Navbar = ({ rightContent }: NavbarProps) => {
         </nav>
 
         {/* Right slot — cart button, etc. */}
-        {rightContent && <div className="flex items-center gap-3">{rightContent}</div>}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {rightContent}
+          <ThemeToggle />
+          {isAuthenticated && <LogoutButton />}
+        </div>
       </div>
     </header>
   )

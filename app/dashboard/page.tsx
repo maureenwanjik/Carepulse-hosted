@@ -7,6 +7,8 @@ import { getPatientOrders } from "@/lib/actions/order.actions";
 import PatientDashboard from "@/components/dashboard/PatientDashboard";
 import Image from "next/image";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
+import LogoutButton from "@/components/LogoutButton";
 
 const DashboardPage = async () => {
   const userId = cookies().get("userId")?.value;
@@ -46,13 +48,15 @@ const DashboardPage = async () => {
               alt="carepulse"
               className="h-10 w-fit"
             />
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <ThemeToggle />
               <Link
                 href="/product"
                 className="text-14-medium text-dark-700 hover:text-white transition-colors"
               >
                 💊 Pharmacy
               </Link>
+              <LogoutButton />
               <Link
                 href={`/patients/${userId}/new-appointment`}
                 className="shad-primary-btn rounded-md px-4 py-2 text-14-medium"

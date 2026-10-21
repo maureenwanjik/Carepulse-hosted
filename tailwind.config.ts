@@ -35,15 +35,15 @@ const config = {
           700: "#F24E43",
         },
         light: {
-          200: "#E8E9E9",
+          200: "rgb(var(--color-light-200) / <alpha-value>)",
         },
         dark: {
-          200: "#0D0F10",
-          300: "#131619",
-          400: "#1A1D21",
-          500: "#363A3D",
-          600: "#76828D",
-          700: "#ABB8C4",
+          200: "rgb(var(--color-dark-200) / <alpha-value>)",
+          300: "rgb(var(--color-dark-300) / <alpha-value>)",
+          400: "rgb(var(--color-dark-400) / <alpha-value>)",
+          500: "rgb(var(--color-dark-500) / <alpha-value>)",
+          600: "rgb(var(--color-dark-600) / <alpha-value>)",
+          700: "rgb(var(--color-dark-700) / <alpha-value>)",
         },
       },
       fontFamily: {
