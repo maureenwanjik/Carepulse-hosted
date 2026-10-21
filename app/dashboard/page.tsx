@@ -2,7 +2,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getUser, getPatient } from "@/lib/actions/patient.actions";
-import { getRecentAppointmentList } from "@/lib/actions/appointment.actions";
+import { getPatientAppointments } from "@/lib/actions/appointment.actions";
 import { getPatientOrders } from "@/lib/actions/order.actions";
 import PatientDashboard from "@/components/dashboard/PatientDashboard";
 import Image from "next/image";
@@ -22,15 +22,10 @@ const DashboardPage = async () => {
   if (!patient) redirect(`/patients/${userId}/register`);
 
   // appointments and orders can run in parallel
-  const [allAppointments, orders] = await Promise.all([
-    getRecentAppointmentList(),
+  const [appointments, orders] = await Promise.all([
+    getPatientAppointments(userId),
     getPatientOrders(userId),
   ]);
-
-  const appointments =
-    allAppointments?.documents?.filter(
-      (apt: any) => apt.patient?.$id === patient?.$id
-    ) || [];
 
   const upcoming = appointments.filter((apt: any) => apt.status === "scheduled");
   const past = appointments.filter(

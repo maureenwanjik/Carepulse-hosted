@@ -1,20 +1,10 @@
 // app/admin/medicines/page.tsx
-import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 import { listMedicines } from "@/lib/actions/medicine.actions";
 import MedicineList from "@/components/medicines/MedicineList";
 import Image from "next/image";
 import Link from "next/link";
 
 export default async function MedicinesPage() {
-  // ── Auth gate: same cookie pattern as your existing admin pages ──────────────
-  const cookieStore = cookies();
-  const userId = cookieStore.get("userId")?.value;
-
-  if (!userId) {
-    redirect("/");
-  }
-
   // ── Fetch medicines server-side ───────────────────────────────────────────────
   const medicines = await listMedicines();
 

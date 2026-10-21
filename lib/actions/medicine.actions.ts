@@ -4,6 +4,7 @@ import { del, put } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "../supabase";
 import { Medicine } from "@/types/appwrite.types";
+import { requireAdminSession } from "@/lib/admin-auth";
 
 export type CreateMedicineParams = {
   medicineName: string;
@@ -91,6 +92,7 @@ const toRow = (input: Partial<CreateMedicineParams>) => {
 };
 
 export const createMedicine = async ({ imageFile, ...medicineData }: CreateMedicineParams): Promise<Medicine | null> => {
+  requireAdminSession();
   try {
     const imageUrl = await uploadImage(imageFile);
     const { data, error } = await getSupabaseAdmin().from("medicines").insert({ ...toRow(medicineData), image_path: imageUrl ?? null }).select().single();
@@ -101,6 +103,7 @@ export const createMedicine = async ({ imageFile, ...medicineData }: CreateMedic
 };
 
 export const updateMedicine = async (id: string, { imageFile, ...updates }: UpdateMedicineParams): Promise<Medicine | null> => {
+  requireAdminSession();
   try {
     const row = toRow(updates);
     if (imageFile) row.image_path = await uploadImage(imageFile);
@@ -112,6 +115,7 @@ export const updateMedicine = async (id: string, { imageFile, ...updates }: Upda
 };
 
 export const deleteMedicine = async (id: string): Promise<boolean> => {
+  requireAdminSession();
   try {
     const supabase = getSupabaseAdmin();
     const { data: medicine } = await supabase.from("medicines").select("image_path").eq("id", id).maybeSingle();

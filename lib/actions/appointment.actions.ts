@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { Appointment } from "@/types/appwrite.types";
 import { formatDateTime, parseStringify } from "../utils";
 import { getSupabaseAdmin } from "../supabase";
+import { cookies } from "next/headers";
+import { hasAdminSession, requireAdminSession } from "@/lib/admin-auth";
 
 const fromAppointment = (row: any) => ({
   ...row, $id: row.id, userId: row.user_id,
@@ -28,6 +30,7 @@ export const createAppointment = async (appointment: CreateAppointmentParams) =>
 };
 
 export const getRecentAppointmentList = async () => {
+  requireAdminSession();
   try {
     const { data, error, count } = await getSupabaseAdmin().from("appointments").select("*, patients(*)", { count: "exact" }).order("created_at", { ascending: false });
     if (error) throw error;
@@ -45,20 +48,39 @@ export const getRecentAppointmentList = async () => {
   }
 };
 
+export const getPatientAppointments = async (userId: string) => {
+  if (!userId || cookies().get("userId")?.value !== userId) return [];
+  try {
+    const { data, error } = await getSupabaseAdmin().from("appointments")
+      .select("*, patients(*)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return parseStringify((data ?? []).map(fromAppointment));
+  } catch (error) {
+    console.error("Could not fetch patient appointments:", error);
+    return [];
+  }
+};
+
 // SMS delivery is not configured in the new stack. Appointment booking and
 // status changes succeed without blocking on an unavailable messaging vendor.
 export const sendSMSNotification = async (_userId: string, _content: string) => ({ skipped: true, reason: "SMS provider is not configured." });
 
 export const updateAppointment = async ({ appointmentId, appointment, type, userId }: UpdateAppointmentParams) => {
   try {
+    const admin = hasAdminSession();
+    if (!admin && (!userId || cookies().get("userId")?.value !== userId)) return null;
     const schedule = appointment.schedule ? new Date(appointment.schedule).toISOString() : undefined;
-    const { data, error } = await getSupabaseAdmin().from("appointments").update({
+    let updateQuery = getSupabaseAdmin().from("appointments").update({
       status: type === "schedule" ? "scheduled" : "cancelled",
       ...(schedule && { schedule }),
       primary_physician: appointment.primaryPhysician,
       note: appointment.note,
       cancellation_reason: appointment.cancellationReason,
-    }).eq("id", appointmentId).select().single();
+    }).eq("id", appointmentId);
+    if (!admin) updateQuery = updateQuery.eq("user_id", userId);
+    const { data, error } = await updateQuery.select().single();
     if (error) throw error;
     const when = schedule ? formatDateTime(schedule).dateTime : "the scheduled time";
     const smsMessage = type === "schedule"

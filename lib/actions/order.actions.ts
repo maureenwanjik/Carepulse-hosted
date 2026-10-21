@@ -2,6 +2,8 @@
 
 import { getSupabaseAdmin } from "../supabase";
 import { parseStringify } from "../utils";
+import { cookies } from "next/headers";
+import { requireAdminSession } from "@/lib/admin-auth";
 
 export type CreateOrderParams = {
   userId: string; patientId: string;
@@ -41,6 +43,7 @@ export const createOrder = async (params: CreateOrderParams) => {
 };
 
 export const getAllOrders = async () => {
+  requireAdminSession();
   try {
     const { data, error } = await getSupabaseAdmin().from("orders").select("*, order_items(*), patients(name,email,phone)").order("created_at", { ascending: false });
     if (error) throw error;
@@ -49,6 +52,7 @@ export const getAllOrders = async () => {
 };
 
 export const getPatientOrders = async (userId: string) => {
+  if (!userId || cookies().get("userId")?.value !== userId) return [];
   try {
     const { data, error } = await getSupabaseAdmin().from("orders").select("*, order_items(*)").eq("user_id", userId).order("created_at", { ascending: false });
     if (error) throw error;
@@ -57,12 +61,14 @@ export const getPatientOrders = async (userId: string) => {
 };
 
 export const getOrderItems = async (orderId: string) => {
+  requireAdminSession();
   const { data, error } = await getSupabaseAdmin().from("order_items").select("*").eq("order_id", orderId).order("created_at");
   if (error) { console.error("Failed to fetch order items:", error); return []; }
   return parseStringify((data ?? []).map((item) => ({ ...item, $id: item.id, orderId: item.order_id, medicineId: item.medicine_id, medicineName: item.medicine_name, unitPrice: Number(item.unit_price) })));
 };
 
 export const updateOrderStatus = async (orderId: string, status: OrderStatus, paymentStatus?: "unpaid" | "paid") => {
+  requireAdminSession();
   const updates: Record<string, string> = { status };
   if (paymentStatus) updates.payment_status = paymentStatus;
   const { data, error } = await getSupabaseAdmin().from("orders").update(updates).eq("id", orderId).select().single();
