@@ -23,11 +23,17 @@ export default function MedicineProductImage({
   className,
 }: Props) {
   const [failed, setFailed] = useState(false);
-  const fallback = medicineId
+  const normalizedName = name.toLowerCase();
+  const medicinePhoto = normalizedName.includes("aminopenicillin")
+    ? "/assets/images/medicine-aminopenicillin.webp"
+    : normalizedName.includes("paracetamol")
+      ? "/assets/images/medicine-paracetamol.webp"
+      : null;
+  const fallback = medicinePhoto ?? (medicineId
     .split("")
     .reduce((sum, char) => sum + char.charCodeAt(0), 0) % 2
     ? "/assets/images/medicine-tablets.svg"
-    : "/assets/images/medicine-liquid.svg";
+    : "/assets/images/medicine-liquid.svg");
 
   return (
     <Image

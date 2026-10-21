@@ -56,9 +56,11 @@ const NewsCard = ({ news }: { news: NewsArticle }) => (
           onError={(e) => { e.currentTarget.style.display = 'none' }}
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <span className="text-4xl">📰</span>
-        </div>
+        <img
+          src="/assets/images/medicine-paracetamol.webp"
+          alt="Paracetamol medicine bottle"
+          className="w-full h-full object-cover"
+        />
       )}
     </div>
 
